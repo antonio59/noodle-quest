@@ -43,7 +43,8 @@ function cfgFor(stage: number): StageCfg {
 }
 
 // Build a lowercased Set of valid dictionary words (2–12 letters).
-const DICTIONARY: Set<string> = (() => {
+// Exported for tests — bookworm-timeout.test.tsx finds a real word on the board.
+export const DICTIONARY: Set<string> = (() => {
   const s = new Set<string>();
   for (const w of EN_GB_CORE_WORDS) {
     const a = (w.answer || '').toUpperCase().replace(/[^A-Z]/g, '');
@@ -128,6 +129,8 @@ export default function BookwormGame({ stage = 1, onScore, onProgress, onEnd, on
   const [remainingMs, setRemainingMs] = useState(cfg.timeLimitSec * 1000);
   const [flash, setFlash] = useState<{ kind: 'good' | 'bad'; word: string } | null>(null);
   const endedRef = useRef(false);
+  const scoreRef = useRef(0);
+  useEffect(() => { scoreRef.current = totalScore; }, [totalScore]);
 
   // Timer — only starts once the player has left the intro screen
   useEffect(() => {
@@ -148,14 +151,15 @@ export default function BookwormGame({ stage = 1, onScore, onProgress, onEnd, on
     if (endedRef.current) return;
     endedRef.current = true;
     const target = cfg.target;
-    const ratio = totalScore / target;
+    const finalScore = scoreRef.current; // the timer closure's totalScore is stale
+    const ratio = finalScore / target;
     const stars = ratio >= 1.2 ? 3 : ratio >= 1 ? 2 : ratio >= 0.5 ? 1 : 0;
     onEnd?.({
-      score: totalScore,
+      score: finalScore,
       stars,
       summary: stars >= 2
-        ? `Reached ${totalScore} points — target was ${target}`
-        : `Made it to ${totalScore} of ${target}. Try again!`,
+        ? `Reached ${finalScore} points — target was ${target}`
+        : `Made it to ${finalScore} of ${target}. Try again!`,
     });
   };
 

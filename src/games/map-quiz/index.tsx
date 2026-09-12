@@ -384,13 +384,7 @@ export default function MapQuiz({ stage, onScore, onProgress, onEnd }: GameProps
           </div>
 
           <button
-            onClick={() => {
-              if (allSolved) {
-                endGame(timeLeft, false);
-              } else {
-                endGame(timeLeft, false);
-              }
-            }}
+            onClick={() => endGame(timeLeft, false)}
             className="bg-card hover:bg-card-hover text-muted hover:text-foreground font-semibold px-4 py-2 rounded-xl border border-foreground/5 transition-colors active:scale-95 text-sm"
             title="Give up & review"
           >

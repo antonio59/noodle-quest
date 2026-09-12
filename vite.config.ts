@@ -30,11 +30,6 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**', '**/.claude/**'],
     // convex-test ships TS that must be transformed by Vite
     server: { deps: { inline: ['convex-test'] } },
-    // A three.js "multiple instances" warning emitted during teardown races
-    // the worker RPC close and fails the run with EnvironmentTeardownError.
-    onConsoleLog(log) {
-      if (log.includes('Multiple instances of Three.js')) return false;
-    },
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'html'],

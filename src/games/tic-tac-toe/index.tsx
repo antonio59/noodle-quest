@@ -19,7 +19,12 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
   const targetWins = stage <= 3 ? stage : 3 + Math.floor(stage / 2);
   const MAX_LOSSES = 3;
   const endedRef = useRef(false);
+  const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [started, setStarted] = useState(false);
+
+  useEffect(() => () => {
+    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+  }, []);
 
   const human: Player = 'X';
   const ai: Player = 'O';
@@ -86,7 +91,8 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
     } else {
       setTurn(ai);
       onMessage('Thinking...');
-      setTimeout(() => {
+      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = setTimeout(() => {
         const aiIdx = bestMove(next, ai, difficulty);
         const afterAi = [...next];
         afterAi[aiIdx] = ai;
@@ -133,6 +139,10 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
   };
 
   const resetBoard = () => {
+    if (aiTimerRef.current) {
+      clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = null;
+    }
     setBoard(Array(9).fill(null));
     setTurn('X');
     setWinner(null);

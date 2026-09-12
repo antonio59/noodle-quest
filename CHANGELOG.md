@@ -41,6 +41,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path could pick a mate-in-1 move — see Changed)
 - Stale `.claude/` worktree copies could run in the Vitest suite —
   excluded from test discovery
+- **Sudoku: 14 of 15 puzzles were broken** — unsolvable, ambiguous, or
+  stored solutions contradicting the givens; all replaced with verified
+  unique-solution puzzles, completion now validates grid rules instead of
+  string-matching, and all 15 puzzles are reachable via play rotation
+- **Bookworm reported score 0 on timeout** — the countdown interval
+  captured a stale score; the earned score is now reported
+- **Connect Lines could start already solved** — symmetric tiles let the
+  random scramble land solved; a rotatable tile is now nudged when so
+- **Tic-Tac-Toe: AI could move onto a reset board** — clicking Play Again
+  during the AI's 400ms think let its move land on the fresh board; the
+  timer is now tracked and cancelled
+- Intermittent vitest `EnvironmentTeardownError` — jsdom canvas calls and
+  React/three.js console noise raced worker shutdown; canvas is stubbed
+  and known noise is filtered in test setup
 
 ### Security
 - **Server-side move validation for every online board game** — illegal

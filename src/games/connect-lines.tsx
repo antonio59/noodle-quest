@@ -55,7 +55,7 @@ function mulberry32(seed: number) {
  * shape of each tile from its tree neighbours, then scramble rotations so
  * the player has to fix them.
  */
-function buildPuzzle(size: number, seed: number): { solved: Puzzle; scrambled: Puzzle } {
+export function buildPuzzle(size: number, seed: number): { solved: Puzzle; scrambled: Puzzle } {
   const rng = mulberry32(seed);
   const rows = size;
   const cols = size;
@@ -126,14 +126,26 @@ function buildPuzzle(size: number, seed: number): { solved: Puzzle; scrambled: P
     scrambledTiles.push(scrRow);
   }
 
-  return {
-    solved: { rows, cols, tiles: solvedTiles },
-    scrambled: { rows, cols, tiles: scrambledTiles },
-  };
+  const scrambledPuzzle: Puzzle = { rows, cols, tiles: scrambledTiles };
+  // A random scramble can land already-solved (line tiles are symmetric) —
+  // nudge one rotatable tile so the player never gets a free win.
+  if (isSolved(scrambledPuzzle)) {
+    outer: for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const t = scrambledTiles[r][c];
+        if (t.shape !== 'empty' && t.shape !== 'cross') {
+          t.rotation = (t.rotation + 1) % 4;
+          break outer;
+        }
+      }
+    }
+  }
+
+  return { solved: { rows, cols, tiles: solvedTiles }, scrambled: scrambledPuzzle };
 }
 
 /** True iff every connection between neighbouring tiles matches on both sides. */
-function isSolved(p: Puzzle): boolean {
+export function isSolved(p: Puzzle): boolean {
   for (let r = 0; r < p.rows; r++) {
     for (let c = 0; c < p.cols; c++) {
       const here = connections(p.tiles[r][c].shape, p.tiles[r][c].rotation);
