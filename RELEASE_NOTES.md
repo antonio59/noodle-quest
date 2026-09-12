@@ -1,6 +1,41 @@
-# Release Notes — Noodle Quest v1.0
+# Release Notes — Noodle Quest
 
-## Overview
+## Next release (unreleased)
+
+This update makes online games trustworthy and more fun: the server now referees every online board game, Cube Twist becomes a real race, and there's a fresh new look.
+
+### 🎲 Online games you can trust
+
+Dice rolls, card deals, tile bags, and Bingo calls now come from the server — not the players' devices. That means nobody can peek at your UNO hand or Scrabble rack, nudge the dice, or call Bingo on a card that doesn't win. If your opponent leaves mid-game, you get the win instead of being stuck on a frozen board.
+
+### 🏁 Cube Twist is a real race now
+
+Online Cube Twist used to make players take turns twisting *one shared* cube — you'd undo each other's progress forever. Now the server scrambles one cube and gives everyone their own copy: first to solve wins, no waiting.
+
+### 🧠 Friendlier opponents
+
+On easy and medium, the Connect Four and Score Four AIs still make mistakes so kids can win — but they'll never again blunder into an instant loss on the very next move.
+
+### ✨ Also in this update
+
+- A new teal-and-gold look for the whole app, plus an optional light theme and a kid mode
+- Online multiplayer for Score Four, 4-player Ludo, and tighter mobile layouts
+- Player names ignore capitalization, so "Alice" and "alice" can't be two different people
+- 400+ automated tests, including a full suite that plays out the online rules to catch cheats
+
+### 🔐 Under the hood
+
+- Every online move is checked server-side — out-of-turn plays, impossible moves, and made-up wins are rejected
+- Sign-in and session handling hardened; expired sessions are cleaned up automatically
+- Dependency security advisories cleared
+
+## Upgrade Notes (next release)
+
+- Run `npx convex deploy` to roll out the server-authoritative game rules — older clients can't play online games against the new server until they update.
+
+---
+
+## 1.0 — Overview
 
 Noodle Quest 1.0 is the "whole family" release: two brand-new 3D games, board-game opponents that actually think ahead, score challenges you can send to each other, fairer difficulty, real Scrabble dictionaries, and a friendlier look — on top of properly secured accounts.
 
@@ -48,7 +83,7 @@ Keyboard play on chess and checkers boards, screen-reader announcements of game 
 - 594 unit tests + Playwright end-to-end smoke tests on every PR
 - Deploy previews finally work — every PR gets a playable URL
 
-## Upgrade Notes
+## Upgrade Notes (1.0)
 
 - Everyone is signed out once by the session upgrade — just log in again.
 - If not yet done, run `npx convex run migrations:hashAllPins` against production and set `ADMIN_SECRET` in the Convex environment.

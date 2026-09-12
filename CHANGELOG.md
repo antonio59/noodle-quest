@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Kid mode and light theme** profile preferences
+- **Online multiplayer for Score Four and Cube Twist**; Ludo expanded to
+  4 seats
+- Teal/gold "kitchen table" brand refresh (replacing the purple shell)
+- Bug-report email notification function (Netlify)
+
+### Changed
+- **Multiplayer is now server-authoritative**: dice rolls (Ludo, Snakes &
+  Ladders), card deals (UNO), tile bags and racks (Scrabble), cube
+  scrambles (Cube Twist), and the Bingo call clock are all generated and
+  validated on the server
+- **Cube Twist online is a race**: each seat solves its own copy of a
+  shared server scramble; first to finish wins (previously players
+  alternated single twists on one shared cube)
+- The server derives the next turn for every online game; client-sent
+  turn fields are ignored and normalized
+- Board-game AIs: easy/medium "blunders" can no longer hand over an
+  immediate loss (they already always took an immediate win)
+- Player names are case-insensitive (no `Alice`/`alice` collisions)
+- Mobile chrome tightened on Games, Rankings, and the app shell
+- Move payloads capped at 64KB, stored move history at 400 entries,
+  sessions at 8 players
+
+### Fixed
+- **Scrabble online**: the guest played from the host's rack, and stray
+  syncs could reset the board
+- Host seeding no longer consumes the first turn
+- **Finished sessions now end locally** — an opponent resigning or
+  disconnecting no longer leaves the other player stuck in-game
+- Flaky Connect Four / Score Four tactic tests (root cause: the blunder
+  path could pick a mate-in-1 move — see Changed)
+- Stale `.claude/` worktree copies could run in the Vitest suite —
+  excluded from test discovery
+
+### Security
+- **Server-side move validation for every online board game** — illegal
+  transitions, forged winner claims, and out-of-turn plays are rejected
+- **Hidden information stays hidden**: UNO opponent hands, Scrabble
+  opponent racks, and the tile pool are stripped from client views;
+  clients can only submit their own cards
+- Bingo win claims must include the card and marks; the server replays
+  the claimed line against its own call list
+- UNO draw/pass and penalty draws handled server-side; Scrabble rack
+  refills drawn server-side from the hidden pool
+- Invite codes are cryptographically random; a direct invite can only be
+  declined by the invitee or retracted by the host
+- Admin/report/score/multiplayer integrity gaps closed; admin and
+  webhook secrets compared in constant time
+- Expired sessions are cleaned up on login; resigning finishes the
+  session server-side so it can't be griefed open
+- Dependency lockfile advisories cleared (OSV Scanner)
+
 ## [1.0.0] - 2026-07-03
 
 The "whole family" release: hardened accounts, genuinely competitive game
