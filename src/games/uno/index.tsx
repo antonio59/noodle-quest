@@ -84,6 +84,9 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
         discard: fresh.discard,
         color: fresh.color,
         currentPlayer: 1,
+        // Dealing is not a turn. Without turnSeat the server rotates to
+        // seat 2 while boardState still says seat 1, deadlocking the game.
+        turnSeat: 1,
       },
     });
   }, [isOnline, onMultiplayerMove, isHost, multiplayerState]);
@@ -332,6 +335,7 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
             discard: newDiscard,
             color,
             currentPlayer: oppSeat,
+            turnSeat: oppSeat,
           },
           winner: mySeat,
         });
@@ -364,6 +368,7 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
           discard: effect.discard,
           color: effect.color,
           currentPlayer: nextPlayer,
+          turnSeat: nextPlayer,
         },
       });
       setIsPlayerTurn(effect.skip);
@@ -408,6 +413,7 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
             discard: discardPile,
             color: currentColor,
             currentPlayer: oppSeat,
+            turnSeat: oppSeat,
           },
         });
         return;

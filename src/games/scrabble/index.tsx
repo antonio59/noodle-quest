@@ -133,6 +133,10 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
         isFirstMove: true,
         lastWord: '',
         dict: dictVariant,
+        // Seeding the deal is not a turn. Without turnSeat the server
+        // rotates play to seat 2, while boardState still says seat 1 —
+        // the host is then locked out of its own first word.
+        turnSeat: 1,
       },
     });
   }, [isOnline, onMultiplayerMove, isHost, multiplayerState, SEATS, dictVariant]);
@@ -404,6 +408,9 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
           isFirstMove: false,
           lastWord: `P${multiplayerState.playerNumber} played "${result.word}" for ${result.score}`,
           dict: dictVariant,
+          // currentSeat is 0-indexed; the server's turn is 1-indexed.
+          // Send it explicitly so the two can never drift apart.
+          turnSeat: nextSeat + 1,
         },
         winner: iWon ? multiplayerState.playerNumber : undefined,
       });
@@ -523,6 +530,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
           isFirstMove,
           lastWord: 'Opponent passed',
           dict: dictVariant,
+          turnSeat: nextSeat + 1,
         },
       });
       return;

@@ -754,7 +754,15 @@ export function PlayGame() {
                 sessionId: sessionId as any,
                 sessionToken: player.sessionToken,
                 move,
-              }).catch(() => {});
+              })
+                // The server returns { error } rather than throwing, so a
+                // rejected move used to vanish silently and the game just
+                // looked frozen. Surface it instead.
+                .then(res => {
+                  const err = (res as { error?: string } | undefined)?.error;
+                  if (err) setMessage(`Move rejected: ${err}`);
+                })
+                .catch(() => setMessage('Connection problem — move not sent.'));
             },
             aiDifficulty,
             numPlayers,
