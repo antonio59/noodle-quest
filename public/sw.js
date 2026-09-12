@@ -6,7 +6,7 @@
  *  - dictionary + icons: stale-while-revalidate
  *  - everything else (Convex API, fonts, etc.): untouched
  */
-const CACHE = 'nq-v3';
+const CACHE = 'nq-v4';
 const APP_SHELL = '/index.html';
 
 self.addEventListener('install', (event) => {
@@ -63,7 +63,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Big static extras: serve from cache, refresh in the background.
-  if (url.pathname.startsWith('/dict/') || url.pathname.startsWith('/icons/') || url.pathname === '/favicon.svg' || url.pathname === '/icons.svg') {
+  if (url.pathname.startsWith('/dict/') || url.pathname.startsWith('/icons/') || url.pathname === '/favicon.svg') {
     event.respondWith(
       caches.match(request).then((hit) => {
         const refresh = fetch(request)

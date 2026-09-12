@@ -7,7 +7,6 @@ import { getAllGames } from '@/lib/game-registry';
 import { GAME_CATEGORIES, type GameCategory } from '@/types';
 import { Heart, Search, Play, Pause, Users, Wind, Star, Sparkles } from 'lucide-react';
 import { RequestGameModal } from '@/components/RequestGameModal';
-import { getGameImage } from '@/lib/game-images';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { TRACKS } from '@/tracks/track-list';
 import { computeBonusTiers, getBonusTier } from '@/lib/bonus-multiplier';
