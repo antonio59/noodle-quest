@@ -155,8 +155,6 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
       turnRef.current = multiplayerState.currentPlayer;
       setTurnSeat(multiplayerState.currentPlayer);
     }
-  // rosterName intentionally omitted — uses latest closure via seats only
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, multiplayerState, onEnd, playerCount, sides, mySeat]);
 
   // Send full board to the server. keepTurn = I rolled a 6.
@@ -241,8 +239,6 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     }
     turnRef.current = 1;
     setTurnSeat(1);
-  // applyCaptures is stable enough via sides; eslint would want it listed
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sides, difficulty, isAiGame, onMessage, onEnd, schedule]);
 
   // ── Move a piece for the seat that is currently acting ───────────────────
@@ -307,7 +303,6 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     turnRef.current = nxt;
     setTurnSeat(nxt);
     if (isAiGame && nxt === 2) schedule(doAi, 800);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sides, isOnline, isAiGame, isHotSeat, mySeat, playerCount, dispatchOnline, onMessage, onScore, onProgress, onEnd, schedule, doAi]);
 
   // ── Roll handler ─────────────────────────────────────────────────────────

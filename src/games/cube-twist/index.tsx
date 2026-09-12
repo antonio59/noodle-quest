@@ -143,7 +143,7 @@ function CubeTwistGame({ stage, onScore, onProgress, onMessage, onEnd, paused, m
   const orbitRef = useRef<{ x: number; y: number; yaw: number; pitch: number } | null>(null);
   const bridgeRef = useRef<{ camera: THREE.Camera; size: { width: number; height: number } } | null>(null);
   const animRef = useRef(anim);
-  animRef.current = anim;
+  useEffect(() => { animRef.current = anim; }, [anim]);
 
   const supported = useMemo(webglSupported, []);
   const animMs = reducedMotion() ? 1 : 180;

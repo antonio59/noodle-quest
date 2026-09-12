@@ -361,12 +361,17 @@ export const makeMove = mutation({
     }
 
     const boardState = args.move?.boardState ?? session.boardState;
-    // Only run per-game board checks when a board snapshot is present
-    // (legacy/partial clients may send move payloads without boardState).
-    if (args.move?.boardState !== undefined) {
-      const rulesError = validateMoveForGame(session.gameId, boardState, winner, seat.seat);
-      if (rulesError) return { error: rulesError };
-    }
+    const rulesError = validateMoveForGame(
+      session.gameId,
+      boardState,
+      winner,
+      seat.seat,
+      {
+        previousBoardState: session.boardState,
+        playerCount: roster.length,
+      },
+    );
+    if (rulesError) return { error: rulesError };
 
     const moves = [...session.moves, { player: seat.seat, move: args.move, at: Date.now() }];
     // Prefer client-supplied turnSeat (Ludo bonus-6 / Cube Twist) when valid.

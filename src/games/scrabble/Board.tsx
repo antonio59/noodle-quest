@@ -82,6 +82,8 @@ export function ScrabbleBoard({ board, placedKeys, isHumanTurn, onCellClick }: S
 
           return (
             <g
+              role="button"
+              aria-label={`Row ${r + 1}, column ${c + 1}${cell ? `: ${cell}` : ''}`}
               key={key}
               onClick={() => isHumanTurn && onCellClick(r, c)}
               style={{ cursor: isHumanTurn ? 'pointer' : 'default' }}
