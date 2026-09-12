@@ -72,6 +72,16 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
     setDictVariant(v);
   };
 
+  // Seat 0 is only "You" offline; online it's whichever seat we occupy.
+  const seatLabel = (i: number): string => {
+    if (i === mySeat) return 'You';
+    if (isOnline) {
+      const other = multiplayerState?.players?.find(p => p.seat === i + 1);
+      return (other?.name ?? 'Opponent').split(/\s+/)[0];
+    }
+    return SEATS > 2 ? `AI ${i}` : 'AI';
+  };
+
   const maxRounds = 6 + stage * 6; // each seat plays maxRounds turns
   const targetScore = stage * 30;
   const isHumanTurn = currentSeat === (isOnline ? mySeat : 0);
@@ -142,9 +152,19 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
   }, [isOnline, onMultiplayerMove, isHost, multiplayerState, SEATS, dictVariant]);
 
   // Online: reconcile from server boardState.
+  //
+  // play.tsx rebuilds `multiplayerState` as a fresh object literal on every
+  // render, so depending on it re-ran this effect on every parent render —
+  // including the onScore/onMessage calls fired while submitting a word.
+  // That overwrote the freshly played board with the pre-move server copy.
+  // Depend on the server values themselves: they only change when the
+  // server does.
+  const serverBoardState = multiplayerState?.boardState;
+  const serverWinner = multiplayerState?.winner;
+  const myPlayerNumber = multiplayerState?.playerNumber;
   useEffect(() => {
-    if (!isOnline || !multiplayerState) return;
-    const bs = multiplayerState.boardState as {
+    if (!isOnline) return;
+    const bs = serverBoardState as {
       board?: (string | null)[][];
       racks?: string[][];
       pool?: string[];
@@ -175,13 +195,13 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       setLockedCells(locked);
     }
     // Winner check
-    if (multiplayerState.winner && !endedRef.current) {
+    if (serverWinner && !endedRef.current) {
       endedRef.current = true;
-      const iWon = multiplayerState.winner === multiplayerState.playerNumber;
+      const iWon = serverWinner === myPlayerNumber;
       const myScore = (bs.scores && bs.scores[mySeat]) || 0;
       onEnd({ score: myScore, stars: iWon ? 3 : 1, summary: iWon ? `You won Scrabble with ${myScore} pts!` : 'Opponent won Scrabble.' });
     }
-  }, [isOnline, multiplayerState, mySeat, onEnd]);
+  }, [isOnline, serverBoardState, serverWinner, myPlayerNumber, mySeat, onEnd]);
 
   const placedKeys = useMemo(() => new Set(placedCells.keys()), [placedCells]);
 
@@ -231,7 +251,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
         const newBoard = board.map(row => [...row]);
         newBoard[r][c] = null;
         setBoard(newBoard);
-        setRacks(prev => prev.map((rack, i) => (i === 0 ? [...rack, letter] : rack)));
+        setRacks(prev => prev.map((rack, i) => (i === mySeat ? [...rack, letter] : rack)));
         const newPlaced = new Map(placedCells);
         newPlaced.delete(key);
         setPlacedCells(newPlaced);
@@ -244,7 +264,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
     const newBoard = board.map(row => [...row]);
     newBoard[r][c] = letter;
     setBoard(newBoard);
-    setRacks(prev => prev.map((rack, i) => (i === 0 ? rack.filter((_, j) => j !== selectedTile) : rack)));
+    setRacks(prev => prev.map((rack, i) => (i === mySeat ? rack.filter((_, j) => j !== selectedTile) : rack)));
     setSelectedTile(null);
     const newPlaced = new Map(placedCells);
     newPlaced.set(key, true);
@@ -495,7 +515,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       }
     }
     setBoard(newBoard);
-    setRacks(prev => prev.map((rack, i) => (i === 0 ? [...rack, ...letters] : rack)));
+    setRacks(prev => prev.map((rack, i) => (i === mySeat ? [...rack, ...letters] : rack)));
     setPlacedCells(new Map());
     setSelectedTile(null);
     setScoreBreakdown(null);
@@ -508,7 +528,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    setRacks(prev => prev.map((rack, i) => (i === 0 ? shuffled : rack)));
+    setRacks(prev => prev.map((rack, i) => (i === mySeat ? shuffled : rack)));
   };
 
   const handlePass = () => {
@@ -681,14 +701,14 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
               <div
                 key={i}
                 className={`flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold ${
-                  i === 0
+                  i === mySeat
                     ? 'bg-accent/15 text-accent ring-1 ring-accent/40'
                     : i === currentSeat
                       ? 'bg-danger/20 text-danger ring-1 ring-danger/40'
                       : 'bg-card text-text-muted'
                 }`}
               >
-                <span className="text-[10px] opacity-70">{i === 0 ? 'You' : `AI ${i}`}</span>
+                <span className="text-[10px] opacity-70">{seatLabel(i)}</span>
                 <span className="text-sm">{s}</span>
               </div>
             ))}
@@ -709,10 +729,10 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
             const pct = Math.min(s / targetScore, 1);
             return (
               <div key={i} className="flex items-center gap-1.5">
-                <span className="text-[9px] text-text-muted w-6 text-right shrink-0">{i === 0 ? 'You' : `AI`}</span>
+                <span className="text-[9px] text-text-muted w-8 text-right shrink-0 truncate">{seatLabel(i)}</span>
                 <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${i === 0 ? 'bg-accent' : 'bg-red-400'}`}
+                    className={`h-full rounded-full transition-all duration-500 ${i === mySeat ? 'bg-accent' : 'bg-red-400'}`}
                     style={{ width: `${pct * 100}%` }}
                   />
                 </div>
@@ -847,6 +867,8 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
               key={`${tile}-${i}`}
               onClick={() => handleRackClick(i)}
               disabled={!isHumanTurn}
+              aria-label={`Tile ${tile}, ${pts} point${pts === 1 ? '' : 's'}`}
+              aria-pressed={selectedTile === i}
               className={`relative w-10 h-11 rounded-lg font-bold text-base flex flex-col items-center justify-center transition-all shadow-sm ${
                 selectedTile === i
                   ? 'bg-accent text-bg ring-2 ring-accent scale-110 -translate-y-1 shadow-lg'

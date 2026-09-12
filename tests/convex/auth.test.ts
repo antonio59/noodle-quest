@@ -61,7 +61,9 @@ describe("logIn", () => {
     expect(res.error).toBe("Wrong PIN!");
   });
 
-  test("locks the account after 5 failed attempts", async () => {
+  // Six PIN verifications at 10k SHA-256 iterations each; the 5s default
+  // is not enough once the full suite is running in parallel.
+  test("locks the account after 5 failed attempts", { timeout: 30000 }, async () => {
     const t = setup();
     await signUp(t);
     for (let i = 0; i < 4; i++) {
