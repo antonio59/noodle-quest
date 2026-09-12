@@ -89,17 +89,27 @@ describe("server deal", () => {
       sessionId, sessionToken: host.sessionToken, move: { action: "deal" },
     });
     const bs = ((await rawSession(t, sessionId))!.boardState) as any;
+    const rack = bs.racks[0] as string[];
+
+    // A letter guaranteed absent from the rack → "Placed tile not in rack."
+    const absent = ["Z", "Q", "X", "J", "K"].find(l => !rack.includes(l))!;
     const board = bs.board.map((r: unknown[]) => [...r]);
-    board[7][7] = "Z"; // almost certainly not in the rack — and if it is, rack math still fails
-    const play = await t.mutation(api.multiplayer.makeMove, {
+    board[7][7] = absent;
+    const forged = await t.mutation(api.multiplayer.makeMove, {
       sessionId, sessionToken: host.sessionToken,
-      move: { boardState: { board, racks: [bs.racks[0], []], scores: [10, 0] } },
+      move: { boardState: { board, racks: [rack, []], scores: [10, 0] } },
     });
-    if (!bs.racks[0].includes("Z")) {
-      expect(play.error).toBe("Placed tile not in rack.");
-    } else {
-      expect(play.error).toBe("Rack does not match play.");
-    }
+    expect(forged.error).toBe("Placed tile not in rack.");
+
+    // Playing a real rack tile while keeping it on the rack duplicates it →
+    // "Rack does not match play."
+    const kept = bs.board.map((r: unknown[]) => [...r]);
+    kept[7][7] = rack[0];
+    const duped = await t.mutation(api.multiplayer.makeMove, {
+      sessionId, sessionToken: host.sessionToken,
+      move: { boardState: { board: kept, racks: [rack, []], scores: [10, 0] } },
+    });
+    expect(duped.error).toBe("Rack does not match play.");
   });
 
   test("uno: deal, draw, pass cycle works with hidden opponent hand", async () => {

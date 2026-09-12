@@ -528,6 +528,11 @@ export function validateScrabble(
   const expectedRack: string[] = [];
   for (const [l, n] of expected) for (let i = 0; i < n; i++) expectedRack.push(l);
   const have = count(myRack as string[]);
+  // Length must match too — otherwise a kept-but-played tile slips through
+  // as an uncounted extra (count(expectedRack) has no key for it).
+  if ((myRack as string[]).length !== expectedRack.length) {
+    return "Rack does not match play.";
+  }
   for (const [l, n] of count(expectedRack)) {
     if (have.get(l) !== n) return "Rack does not match play.";
   }
