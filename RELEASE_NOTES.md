@@ -1,6 +1,6 @@
 # Release Notes — Noodle Quest
 
-## Next release (unreleased)
+## 1.1 — 13 September 2026
 
 This update makes online games trustworthy and more fun: the server now referees every online board game, Cube Twist becomes a real race, and there's a fresh new look.
 
@@ -21,6 +21,8 @@ On easy and medium, the Connect Four and Score Four AIs still make mistakes so k
 - A new teal-and-gold look for the whole app, plus an optional light theme and a kid mode
 - Online multiplayer for Score Four, 4-player Ludo, and tighter mobile layouts
 - Player names ignore capitalization, so "Alice" and "alice" can't be two different people
+- Sudoku got a full repair — most of its puzzles were unwinnable before; all 15 are now verified solvable
+- Bookworm keeps your score if the clock runs out, Connect Lines never starts already solved, and Tic-Tac-Toe's AI can no longer sneak a move onto a reset board
 - 400+ automated tests, including a full suite that plays out the online rules to catch cheats
 
 ### 🔐 Under the hood
@@ -29,7 +31,7 @@ On easy and medium, the Connect Four and Score Four AIs still make mistakes so k
 - Sign-in and session handling hardened; expired sessions are cleaned up automatically
 - Dependency security advisories cleared
 
-## Upgrade Notes (next release)
+## Upgrade Notes (1.1)
 
 - Run `npx convex deploy` to roll out the server-authoritative game rules — older clients can't play online games against the new server until they update.
 
