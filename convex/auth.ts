@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import {
   hashPin,
@@ -20,6 +21,15 @@ const AVATARS = [
   "🐲","👻","🤖","👽","🧙","🧛","🦸","🦹","🌵","🍄","🌻","⭐","🔥","💎","🎯","🍜",
 ];
 
+/** Case-insensitive name lookup — prevents "Alice"/"alice" impersonation. */
+async function findPlayerByName(ctx: MutationCtx, name: string) {
+  const exact = await ctx.db.query("players").withIndex("by_name", q => q.eq("name", name)).unique();
+  if (exact) return exact;
+  const lower = name.toLowerCase();
+  const all = await ctx.db.query("players").collect();
+  return all.find(p => p.name.toLowerCase() === lower) ?? null;
+}
+
 export const signUp = mutation({
   args: { name: v.string(), pin: v.string(), avatar: v.optional(v.string()) },
   handler: async (ctx, args) => {
@@ -28,7 +38,7 @@ export const signUp = mutation({
     if (name.length > 30) return { error: "Name is too long (30 characters max)." };
     if (!isValidPin(args.pin)) return { error: "Passcode must be 6 digits." };
 
-    const existing = await ctx.db.query("players").withIndex("by_name", q => q.eq("name", name)).unique();
+    const existing = await findPlayerByName(ctx, name);
     if (existing) return { error: "Name already taken!" };
 
     const avatar = args.avatar && AVATARS.includes(args.avatar)
@@ -88,6 +98,14 @@ export const logIn = mutation({
     }
 
     await ctx.db.patch(player._id, { lastActive: now, failedAttempts: 0, lockedUntil: undefined });
+    // Hygiene: drop expired sessions so the table doesn't grow forever.
+    const stale = await ctx.db
+      .query("sessions")
+      .withIndex("by_player", q => q.eq("playerId", player._id))
+      .collect();
+    for (const s of stale) {
+      if (s.expiresAt < now) await ctx.db.delete(s._id);
+    }
     const sessionToken = await createSession(ctx, player._id);
     return {
       playerId: player._id,
@@ -157,7 +175,7 @@ export const updateName = mutation({
     const trimmed = args.name.trim();
     if (trimmed.length < 2) return { error: "Name needs at least 2 characters!" };
     if (trimmed.length > 30) return { error: "Name is too long (30 characters max)." };
-    const existing = await ctx.db.query("players").withIndex("by_name", q => q.eq("name", trimmed)).unique();
+    const existing = await findPlayerByName(ctx, trimmed);
     if (existing && existing._id !== player._id) return { error: "Name already taken!" };
     await ctx.db.patch(player._id, { name: trimmed });
     return { success: true, name: trimmed };

@@ -113,14 +113,33 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
 
   const canAct = isHumanControlling(turnSeat) && !over;
 
+  // Send the resulting board to the server. lastRoll consumes the
+  // pending server roll; a 6 keeps the turn (server derives it).
+  const dispatchOnline = useCallback((pieces: number[][], d: number, actingSeat: number) => {
+    if (!isOnline) return;
+    const iWon = pieces[actingSeat - 1]?.every(p => p >= HOME) ?? false;
+    onMultiplayerMove?.({
+      boardState: {
+        pieces: pieces.map(p => [...p]),
+        lastRoll: d,
+      },
+      winner: iWon ? actingSeat : undefined,
+    });
+  }, [isOnline, onMultiplayerMove]);
+
   // ── Online sync ──────────────────────────────────────────────────────────
-  // boardState carries seat-indexed relative piece arrays plus an explicit
-  // turnSeat: bonus rolls on a 6 break the server's automatic turn
-  // rotation, so the authoritative turn travels with the board.
+  // Dice come from the server: `action:'roll'` stores pendingRoll, the
+  // follow-up move carries lastRoll to consume it. A 6 keeps the turn.
+  const processingRollRef = useRef(false);
   useEffect(() => {
     if (!isOnline) return;
     const bs = multiplayerState.boardState as
-      | { pieces?: number[][]; lastRoll?: number; turnSeat?: number }
+      | {
+          pieces?: number[][];
+          lastRoll?: number;
+          turnSeat?: number;
+          pendingRoll?: { seat: number; value: number };
+        }
       | null
       | undefined;
     if (bs && Array.isArray(bs.pieces)) {
@@ -155,21 +174,30 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
       turnRef.current = multiplayerState.currentPlayer;
       setTurnSeat(multiplayerState.currentPlayer);
     }
-  }, [isOnline, multiplayerState, onEnd, playerCount, sides, mySeat]);
 
-  // Send full board to the server. keepTurn = I rolled a 6.
-  const dispatchOnline = useCallback((pieces: number[][], d: number, keepTurn: boolean, actingSeat: number) => {
-    if (!isOnline) return;
-    const iWon = pieces[actingSeat - 1]?.every(p => p >= HOME) ?? false;
-    onMultiplayerMove?.({
-      boardState: {
-        pieces: pieces.map(p => [...p]),
-        lastRoll: d,
-        turnSeat: keepTurn && !iWon ? actingSeat : nextSeat(actingSeat, playerCount),
-      },
-      winner: iWon ? actingSeat : undefined,
-    });
-  }, [isOnline, onMultiplayerMove, playerCount]);
+    // A live server roll for me — resolve it now.
+    const pending = bs?.pendingRoll;
+    if (pending && pending.seat === mySeat && !endedRef.current && !overRef.current) {
+      if (processingRollRef.current) return;
+      processingRollRef.current = true;
+      const d = pending.value;
+      setDice(d);
+      playDice();
+      const mv = getMovableIndices(piecesRef.current[mySeat - 1] ?? [], d);
+      if (mv.length === 0) {
+        onMessage(`Rolled ${d} — no piece can move!`);
+        dispatchOnline(piecesRef.current, d, mySeat);
+      } else if (mv.length === 1) {
+        movePiece(mv[0], d, mySeat);
+      } else {
+        setPendingDice(d);
+        setMovable(mv);
+        onMessage(`Rolled ${d} — tap a glowing piece to move!`);
+      }
+    } else {
+      processingRollRef.current = false;
+    }
+  }, [isOnline, multiplayerState, onEnd, playerCount, sides, mySeat, onMessage]);
 
   /** Apply captures against every other seat; returns whether anyone was hit. */
   const applyCaptures = (pieces: number[][], moverSeatIdx: number, moverRel: number): boolean => {
@@ -271,7 +299,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     const bonus = d === 6 && !won;
 
     if (isOnline) {
-      dispatchOnline(next, d, bonus, actingSeat);
+      dispatchOnline(next, d, actingSeat);
     }
 
     if (won) {
@@ -308,6 +336,11 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
   // ── Roll handler ─────────────────────────────────────────────────────────
   const handleRoll = () => {
     if (endedRef.current || overRef.current || !canAct || pendingDice !== null) return;
+    if (isOnline) {
+      // Server rolls; the reconcile effect resolves the pending roll.
+      onMultiplayerMove?.({ action: 'roll' });
+      return;
+    }
     const acting = turnSeat;
     const d = rollDie();
     setDice(d);
@@ -316,9 +349,6 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     const mv = getMovableIndices(piecesRef.current[acting - 1], d);
     if (mv.length === 0) {
       onMessage(`Rolled ${d} — no piece can move!`);
-      if (isOnline) {
-        dispatchOnline(piecesRef.current, d, false, acting);
-      }
       const nxt = nextSeat(acting, playerCount);
       turnRef.current = nxt;
       setTurnSeat(nxt);

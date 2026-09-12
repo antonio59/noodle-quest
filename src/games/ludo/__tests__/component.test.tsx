@@ -69,45 +69,77 @@ describe('ludo online multiplayer', () => {
     expect(screen.getByRole('button', { name: /waiting/i })).toBeDisabled();
   });
 
-  test('dispatches my move to the server with the turn handed over', () => {
+  test('requests a server roll then dispatches the resolved move', () => {
     const onMove = vi.fn();
     const myTurn: MultiplayerState = {
       ...online,
       boardState: { pieces: [[5, -1, -1, -1], [10, -1, -1, -1]], lastRoll: 2, turnSeat: 1 },
     };
-    // Roll a 3 (0.4 * 6 = 2.4 → floor 2 → +1 = 3): only piece 0 can move
-    vi.spyOn(Math, 'random').mockReturnValue(0.4);
-    render(<LudoGame {...props} multiplayerState={myTurn} onMultiplayerMove={onMove} />);
+    const { rerender } = render(<LudoGame {...props} multiplayerState={myTurn} onMultiplayerMove={onMove} />);
     startGame();
 
     fireEvent.click(screen.getByRole('button', { name: /roll/i }));
-    expect(onMove).toHaveBeenCalledTimes(1);
-    const payload = onMove.mock.calls[0][0] as { boardState: { pieces: number[][]; turnSeat: number } };
+    // The client asks the server to roll — it never rolls locally online.
+    expect(onMove).toHaveBeenCalledWith({ action: 'roll' });
+
+    // Server echoes a pending roll of 3; only piece 0 can move → auto-dispatch.
+    rerender(
+      <LudoGame
+        {...props}
+        multiplayerState={{
+          ...myTurn,
+          boardState: {
+            pieces: [[5, -1, -1, -1], [10, -1, -1, -1]],
+            lastRoll: 2,
+            turnSeat: 1,
+            pendingRoll: { seat: 1, value: 3 },
+          },
+        }}
+        onMultiplayerMove={onMove}
+      />,
+    );
+    expect(onMove).toHaveBeenCalledTimes(2);
+    const payload = onMove.mock.calls[1][0] as { boardState: { pieces: number[][]; lastRoll: number } };
     expect(payload.boardState.pieces[0][0]).toBe(8); // 5 + 3
-    expect(payload.boardState.turnSeat).toBe(2);     // not a 6 → turn passes
+    expect(payload.boardState.lastRoll).toBe(3);
+    // The server derives the next turn — the client sends no turnSeat.
+    expect(payload.boardState).not.toHaveProperty('turnSeat');
   });
 
-  test('a 6 keeps the turn for a bonus roll', () => {
+  test('a server-rolled 6 offers every movable piece', () => {
     const onMove = vi.fn();
     const myTurn: MultiplayerState = {
       ...online,
       boardState: { pieces: [[5, -1, -1, -1], [10, -1, -1, -1]], lastRoll: 2, turnSeat: 1 },
     };
-    vi.spyOn(Math, 'random').mockReturnValue(0.99); // rollDie → 6
-    render(<LudoGame {...props} multiplayerState={myTurn} onMultiplayerMove={onMove} />);
+    render(
+      <LudoGame
+        {...props}
+        multiplayerState={{
+          ...myTurn,
+          boardState: {
+            pieces: [[5, -1, -1, -1], [10, -1, -1, -1]],
+            lastRoll: 2,
+            turnSeat: 1,
+            pendingRoll: { seat: 1, value: 6 },
+          },
+        }}
+        onMultiplayerMove={onMove}
+      />,
+    );
     startGame();
 
-    fireEvent.click(screen.getByRole('button', { name: /roll/i }));
-    // With a 6, two options (advance piece 0, or bring a new piece out):
-    // the chooser appears; pick the first option.
+    // With a 6, four options (advance piece 0, or bring a base piece out).
     const options = screen.getAllByRole('button', { name: /piece \d/i });
+    expect(options).toHaveLength(4);
     fireEvent.click(options[0]);
     expect(onMove).toHaveBeenCalledTimes(1);
-    const payload = onMove.mock.calls[0][0] as { boardState: { turnSeat: number } };
-    expect(payload.boardState.turnSeat).toBe(1); // bonus roll — still my turn
+    const payload = onMove.mock.calls[0][0] as { boardState: { pieces: number[][]; lastRoll: number } };
+    expect(payload.boardState.pieces[0][0]).toBe(11); // 5 + 6
+    expect(payload.boardState.lastRoll).toBe(6);
   });
 
-  test('4-player online rotates turnSeat past seat 4 back to 1', () => {
+  test('4-player online resolves a pending roll for seat 4', () => {
     const onMove = vi.fn();
     const four: MultiplayerState = {
       sessionId: 's4',
@@ -131,17 +163,16 @@ describe('ludo online multiplayer', () => {
         ],
         lastRoll: 2,
         turnSeat: 4,
+        pendingRoll: { seat: 4, value: 3 },
       },
     };
-    vi.spyOn(Math, 'random').mockReturnValue(0.4); // roll 3
     render(<LudoGame {...props} multiplayerState={four} onMultiplayerMove={onMove} />);
     startGame();
 
-    fireEvent.click(screen.getByRole('button', { name: /roll/i }));
     expect(onMove).toHaveBeenCalledTimes(1);
-    const payload = onMove.mock.calls[0][0] as { boardState: { pieces: number[][]; turnSeat: number } };
+    const payload = onMove.mock.calls[0][0] as { boardState: { pieces: number[][]; lastRoll: number } };
     expect(payload.boardState.pieces).toHaveLength(4);
     expect(payload.boardState.pieces[3][0]).toBe(8);
-    expect(payload.boardState.turnSeat).toBe(1); // seat 4 → seat 1
+    expect(payload.boardState.lastRoll).toBe(3);
   });
 });

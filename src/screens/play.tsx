@@ -1,4 +1,4 @@
-import { useState, useEffect, createElement, Suspense, useRef } from 'react';
+import { useState, useEffect, createElement, Suspense, useRef, useMemo, useCallback } from 'react';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Star, ChevronRight, ChevronDown, ArrowRight, Lock, Flag, Loader2, Copy, Check } from 'lucide-react';
@@ -100,6 +100,7 @@ export function PlayGame() {
   const createInvite = useMutation(api.multiplayer.createInvite);
   const startSession = useMutation(api.multiplayer.startSession);
   const makeMove = useMutation(api.multiplayer.makeMove);
+  const resignSession = useMutation(api.multiplayer.resignSession);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(joinerSessionId ?? null);
   const [creatingInvite, setCreatingInvite] = useState(false);
@@ -122,11 +123,77 @@ export function PlayGame() {
       .catch(() => setCreatingInvite(false));
   }, [isMultiplayer, player?.playerId, gameId]);
 
-  // Live lobby state — roster of players who've joined so far.
+  // Live lobby state — roster of players who've joined so far. The token
+  // lets the server reveal our own hidden state (e.g. our UNO hand).
   const liveSession = useQuery(
     api.multiplayer.getSession,
-    sessionId ? { sessionId: sessionId as any } : 'skip' as any,
+    sessionId && player
+      ? { sessionId: sessionId as any, sessionToken: player.sessionToken }
+      : 'skip' as any,
   );
+
+  const isLivePlaying = isMultiplayer && !!liveSession && liveSession.status === 'playing';
+  const mySeat = liveSession?.players.find(
+    p => player && p.id === (player.playerId as any),
+  );
+
+  // Keep this object identity stable across local score/message re-renders.
+  // Games hydrate from multiplayerState in effects; a fresh literal every
+  // paint was overwriting in-flight local boards with the pre-move server copy.
+  const multiplayerView = useMemo(() => {
+    if (!isLivePlaying || !liveSession || !mySeat) return undefined;
+    const other = liveSession.players.find(p => p.seat !== mySeat.seat);
+    return {
+      sessionId: sessionId ?? '',
+      playerNumber: mySeat.seat,
+      currentPlayer: liveSession.currentPlayer,
+      boardState: liveSession.boardState,
+      opponentName: other?.name ?? '',
+      opponentAvatar: other?.avatar ?? '',
+      players: liveSession.players,
+      status: liveSession.status as 'waiting' | 'lobby' | 'playing' | 'finished',
+      winner: liveSession.winner,
+    };
+  }, [
+    isLivePlaying,
+    sessionId,
+    mySeat?.id,
+    mySeat?.seat,
+    liveSession?.currentPlayer,
+    liveSession?.boardState,
+    liveSession?.winner,
+    liveSession?.status,
+    liveSession?.players,
+  ]);
+
+  // If the server session ends without the local game noticing (e.g. the
+  // opponent resigned or their tab closed mid-move), close out locally so
+  // the remaining player isn't stuck on a live board forever.
+  const liveStatus = liveSession?.status;
+  const liveWinner = liveSession?.winner;
+  useEffect(() => {
+    if (!isMultiplayer || liveStatus !== 'finished' || ended) return;
+    const iWon = liveWinner !== undefined && liveWinner === mySeat?.seat;
+    handleEnd({
+      score: iWon ? 60 : 10,
+      stars: iWon ? 3 : 1,
+      summary: iWon ? 'Your opponent left — you win by forfeit!' : 'The game has ended.',
+    });
+  }, [isMultiplayer, liveStatus, liveWinner, ended, mySeat?.seat]);
+
+  const handleMultiplayerMove = useCallback((move: unknown) => {
+    if (!sessionId || !player) return;
+    makeMove({
+      sessionId: sessionId as any,
+      sessionToken: player.sessionToken,
+      move,
+    })
+      .then(res => {
+        const err = (res as { error?: string } | undefined)?.error;
+        if (err) setMessage(`Move rejected: ${err}`);
+      })
+      .catch(() => setMessage('Connection problem — move not sent.'));
+  }, [sessionId, player?.sessionToken, makeMove]);
 
   if (!gameMeta || !gameId || !GameComponent) return null;
 
@@ -134,12 +201,6 @@ export function PlayGame() {
   const maxPlayers = gameMeta.maxPlayers ?? 2;
   // Lobby only appears for multi-player games so the user can choose how many AI opponents
   const showLobby = !lobbyDone && maxPlayers > 2 && !isMultiplayer;
-
-  // Once the session is live, the normal GameComponent render path kicks in.
-  const isLivePlaying = isMultiplayer && !!liveSession && liveSession.status === 'playing';
-  const mySeat = liveSession?.players.find(
-    p => player && p.id === (player.playerId as any),
-  );
 
   // Joiner waiting-in-lobby screen: has sessionId, no inviteCode of their own,
   // and the session isn't playing yet.
@@ -438,6 +499,11 @@ export function PlayGame() {
   );
 
   const goBackToGames = () => {
+    // Quitting mid-game resigns the session so the opponent isn't left waiting.
+    if (isMultiplayer && sessionId && player && liveSession && liveSession.status !== 'finished') {
+      resignSession({ sessionId: sessionId as any, sessionToken: player.sessionToken })
+        .catch(() => {});
+    }
     navigate(`/games${fromTab !== 'brain' ? `?tab=${fromTab}` : ''}`);
   };
 
@@ -735,35 +801,8 @@ export function PlayGame() {
             onMessage: setMessage,
             onEnd: handleEnd,
             paused: gamePaused,
-            multiplayerState: isLivePlaying && liveSession && mySeat
-              ? {
-                  sessionId: sessionId ?? '',
-                  playerNumber: mySeat.seat,
-                  currentPlayer: liveSession.currentPlayer,
-                  boardState: liveSession.boardState,
-                  opponentName: liveSession.players.find(p => p.seat !== mySeat.seat)?.name ?? '',
-                  opponentAvatar: liveSession.players.find(p => p.seat !== mySeat.seat)?.avatar ?? '',
-                  players: liveSession.players,
-                  status: liveSession.status as 'waiting' | 'lobby' | 'playing' | 'finished',
-                  winner: liveSession.winner,
-                }
-              : undefined,
-            onMultiplayerMove: (move: unknown) => {
-              if (!sessionId || !player) return;
-              makeMove({
-                sessionId: sessionId as any,
-                sessionToken: player.sessionToken,
-                move,
-              })
-                // The server returns { error } rather than throwing, so a
-                // rejected move used to vanish silently and the game just
-                // looked frozen. Surface it instead.
-                .then(res => {
-                  const err = (res as { error?: string } | undefined)?.error;
-                  if (err) setMessage(`Move rejected: ${err}`);
-                })
-                .catch(() => setMessage('Connection problem — move not sent.'));
-            },
+            multiplayerState: multiplayerView,
+            onMultiplayerMove: handleMultiplayerMove,
             aiDifficulty,
             numPlayers,
           })}

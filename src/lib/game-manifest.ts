@@ -280,7 +280,7 @@ reg('ludo', {
   name: 'Ludo', emoji: '🎲',
   description: 'Roll the dice and race all 4 pieces home!',
   category: 'board', stages: 99,
-  minPlayers: 2, maxPlayers: 2,
+  minPlayers: 2, maxPlayers: 4,
 }, () => import('@/games/ludo'));
 
 reg('scrabble', {
@@ -301,7 +301,7 @@ reg('snakes-ladders', {
   name: 'Snakes & Ladders', emoji: '🐍',
   description: 'Classic race game — climb ladders, dodge snakes!',
   category: 'board', stages: 99,
-  minPlayers: 2, maxPlayers: 4,
+  minPlayers: 2, maxPlayers: 2,
 }, () => import('@/games/snakes-ladders'));
 
 reg('tic-tac-toe', {
@@ -315,7 +315,7 @@ reg('uno', {
   name: 'UNO', emoji: '🃏',
   description: 'Match colors and numbers — be first to empty your hand!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
-  minPlayers: 2, maxPlayers: 4,
+  minPlayers: 2, maxPlayers: 2,
 }, () => import('@/games/uno'));
 
 reg('wordsearch', {

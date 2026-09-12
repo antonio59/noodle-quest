@@ -15,8 +15,15 @@ import {
 } from './dictionary';
 
 
-// ── Component ──────────────────────────────────────────────────────────
-// Seat 0 = local human. Seats 1..N-1 = AI opponents (until online relay is wired).
+function occupancy(board: (string | null)[][]): number {
+  let n = 0;
+  for (const row of board) for (const cell of row) if (cell) n++;
+  return n;
+}
+
+function cloneBoard(board: (string | null)[][]): (string | null)[][] {
+  return board.map(row => [...row]);
+}
 function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty = 'medium', numPlayers, multiplayerState, onMultiplayerMove }: GameProps) {
   const isOnline = !!multiplayerState;
   const isHost = isOnline && multiplayerState.playerNumber === 1;
@@ -51,6 +58,10 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
   const [dictStatus, setDictStatus] = useState<'loading' | 'ready' | 'error' | 'fallback'>('loading');
   const endedRef = useRef(false);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Board we just dispatched, held until the server snapshot is at least as
+  // full. Convex can re-emit the pre-move document while makeMove is in
+  // flight; applying that would make the submitted word vanish.
+  const pendingOnlineBoardRef = useRef<(string | null)[][] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,35 +132,16 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
 
   }, []);
 
-  // Online: host seeds initial state once.
+  // Online: host asks the server to deal — the bag order and opponent
+  // racks are server-secret; we only ever see our own rack.
   const seededRef = useRef(false);
   useEffect(() => {
     if (!isOnline || !onMultiplayerMove || !isHost || seededRef.current) return;
     const bs = multiplayerState?.boardState as { racks?: unknown } | null | undefined;
     if (bs && bs.racks) return;
     seededRef.current = true;
-    const fresh = buildTilePool();
-    const dealt: string[][] = [];
-    for (let i = 0; i < SEATS; i++) dealt.push(fresh.splice(0, 7));
-    const emptyBoard = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
-    const emptyScores = Array.from({ length: SEATS }, () => 0);
-    onMultiplayerMove({
-      boardState: {
-        board: emptyBoard,
-        racks: dealt,
-        pool: fresh,
-        scores: emptyScores,
-        currentSeat: 0,
-        isFirstMove: true,
-        lastWord: '',
-        dict: dictVariant,
-        // Seeding the deal is not a turn. Without turnSeat the server
-        // rotates play to seat 2, while boardState still says seat 1 —
-        // the host is then locked out of its own first word.
-        turnSeat: 1,
-      },
-    });
-  }, [isOnline, onMultiplayerMove, isHost, multiplayerState, SEATS, dictVariant]);
+    onMultiplayerMove({ action: 'deal', dict: dictVariant });
+  }, [isOnline, onMultiplayerMove, isHost, multiplayerState, dictVariant]);
 
   // Online: reconcile from server boardState.
   //
@@ -175,14 +167,21 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       dict?: string;
     } | null | undefined;
     if (!bs || !bs.racks) return;
+    // Don't yank tiles the player is still arranging this turn.
+    if (placedCells.size > 0) return;
+    if (pendingOnlineBoardRef.current) {
+      const pending = pendingOnlineBoardRef.current;
+      if (!Array.isArray(bs.board) || occupancy(bs.board) < occupancy(pending)) return;
+      pendingOnlineBoardRef.current = null;
+    }
     // Everyone validates against the host's dictionary choice.
     if (isDictVariant(bs.dict)) {
       setDictVariant(cur => (cur === bs.dict ? cur : bs.dict as DictVariant));
     }
-    if (bs.board) setBoard(bs.board);
-    if (bs.racks) setRacks(bs.racks);
-    if (bs.pool) setPool(bs.pool);
-    if (bs.scores) setScores(bs.scores);
+    if (bs.board) setBoard(cloneBoard(bs.board));
+    if (bs.racks) setRacks(bs.racks.map(rack => [...rack]));
+    if (bs.pool) setPool([...bs.pool]);
+    if (bs.scores) setScores([...bs.scores]);
     if (typeof bs.currentSeat === 'number') setCurrentSeat(bs.currentSeat);
     if (typeof bs.isFirstMove === 'boolean') setIsFirstMove(bs.isFirstMove);
     if (typeof bs.lastWord === 'string') setLastWord(bs.lastWord);
@@ -201,7 +200,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       const myScore = (bs.scores && bs.scores[mySeat]) || 0;
       onEnd({ score: myScore, stars: iWon ? 3 : 1, summary: iWon ? `You won Scrabble with ${myScore} pts!` : 'Opponent won Scrabble.' });
     }
-  }, [isOnline, serverBoardState, serverWinner, myPlayerNumber, mySeat, onEnd]);
+  }, [isOnline, serverBoardState, serverWinner, myPlayerNumber, mySeat, onEnd, placedCells.size]);
 
   const placedKeys = useMemo(() => new Set(placedCells.keys()), [placedCells]);
 
@@ -396,6 +395,8 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
     }
     const seat = isOnline ? mySeat : 0;
     const newScores = scores.map((s, i) => (i === seat ? s + result.score : s));
+    const committed = cloneBoard(board);
+    if (isOnline) pendingOnlineBoardRef.current = committed;
     setScores(newScores);
     onScore(result.score);
     setLastWord(`You played "${result.word}" for ${result.score}`);
@@ -408,29 +409,22 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
     setPlacedCells(new Map());
     setIsFirstMove(false);
 
-    const { rack: newRack, pool: newPool } = drawUpTo7(playerRack, pool);
-    const newRacks = racks.map((rack, i) => (i === seat ? newRack : rack));
-    setRacks(newRacks);
-    setPool(newPool);
-
     if (isOnline && onMultiplayerMove && multiplayerState) {
+      // Send the depleted rack — the server validates the play and refills
+      // from its hidden pool (our local `pool` is just placeholders).
       const nextSeat = (seat + 1) % SEATS;
-      // Endgame: if my score >= targetScore, declare winner
       const myNewScore = newScores[seat] ?? 0;
-      const iWon = myNewScore >= targetScore && stage >= 0; // simple target check
+      const iWon = myNewScore >= targetScore && stage >= 0;
+      const depletedRacks = racks.map((rack, i) => (i === seat ? [...playerRack] : rack));
+      setRacks(depletedRacks);
       onMultiplayerMove({
         boardState: {
-          board,
-          racks: newRacks,
-          pool: newPool,
+          board: committed,
+          racks: depletedRacks,
           scores: newScores,
-          currentSeat: nextSeat,
           isFirstMove: false,
           lastWord: `P${multiplayerState.playerNumber} played "${result.word}" for ${result.score}`,
           dict: dictVariant,
-          // currentSeat is 0-indexed; the server's turn is 1-indexed.
-          // Send it explicitly so the two can never drift apart.
-          turnSeat: nextSeat + 1,
         },
         winner: iWon ? multiplayerState.playerNumber : undefined,
       });
@@ -440,6 +434,11 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       }
       return;
     }
+
+    const { rack: newRack, pool: newPool } = drawUpTo7(playerRack, pool);
+    const newRacks = racks.map((rack, i) => (i === seat ? newRack : rack));
+    setRacks(newRacks);
+    setPool(newPool);
 
     advanceSeat(newScores);
   };
@@ -533,24 +532,32 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
 
   const handlePass = () => {
     if (!isHumanTurn) return;
-    handleClear();
+    const letters: string[] = [];
+    const cleared = cloneBoard(board);
+    for (const key of placedKeys) {
+      const [r, c] = key.split(',').map(Number);
+      if (cleared[r][c]) {
+        letters.push(cleared[r][c]!);
+        cleared[r][c] = null;
+      }
+    }
+    setBoard(cleared);
+    setRacks(prev => prev.map((rack, i) => (i === mySeat ? [...rack, ...letters] : rack)));
+    setPlacedCells(new Map());
+    setSelectedTile(null);
+    setScoreBreakdown(null);
     onMessage('You passed your turn');
     setLastWord('You passed');
-    setScoreBreakdown(null);
     if (isOnline && onMultiplayerMove) {
-      const seat = mySeat;
-      const nextSeat = (seat + 1) % SEATS;
+      const restoredRacks = racks.map((rack, i) => (i === mySeat ? [...rack, ...letters] : rack));
       onMultiplayerMove({
         boardState: {
-          board,
-          racks,
-          pool,
+          board: cleared,
+          racks: restoredRacks,
           scores,
-          currentSeat: nextSeat,
           isFirstMove,
           lastWord: 'Opponent passed',
           dict: dictVariant,
-          turnSeat: nextSeat + 1,
         },
       });
       return;

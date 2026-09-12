@@ -1,10 +1,29 @@
 /**
  * Server-side move checks for online board games.
  * Validates board shape and that claimed wins match the submitted state.
- * Where previous board + last move are present (chess), also checks legality.
+ * Where previous board + last move are present, also checks legality.
  */
 
 import { Chess } from "chess.js";
+import {
+  UNO_COLORS,
+  isBingoCard,
+  isBingoMarks,
+  isCubeShape,
+  isLegalLudoResult,
+  isLegalSnakesResult,
+  isOneCubeTwist,
+  isProvableBingoWin,
+  isScrabbleLetter,
+  cubeIsSolved,
+  isUnoCard,
+  unoCanPlay,
+  SCRABBLE_BOARD_SIZE,
+  SNL_BOARD_SIZE,
+  LUDO_HOME,
+  type Cube,
+  type UnoCard,
+} from "./gameRules";
 
 type Seat = number;
 
@@ -40,7 +59,11 @@ export function validateConnectFour(
   }
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
-  if (winner === undefined || winner === 0) return null;
+  if (winner === undefined) return null;
+  if (winner === 0) {
+    const full = (board as (string | null)[][]).every(row => row.every(c => c !== null));
+    return full ? null : "Board is not full.";
+  }
   const color = seat === 1 ? "red" : "yellow";
   if (!hasConnectFourWin(board as (string | null)[][], color)) {
     return "Board does not show a win.";
@@ -82,7 +105,10 @@ export function validateScoreFour(
   }
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
-  if (winner === undefined || winner === 0) return null;
+  if (winner === undefined) return null;
+  if (winner === 0) {
+    return (board as number[]).every(c => c !== 0) ? null : "Board is not full.";
+  }
   if (!hasScoreFourWin(board as number[], seat as 1 | 2)) {
     return "Board does not show a win.";
   }
@@ -129,7 +155,10 @@ export function validateTicTacToe(
   }
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
-  if (winner === undefined || winner === 0) return null;
+  if (winner === undefined) return null;
+  if (winner === 0) {
+    return (board as (string | null)[]).every(c => c !== null) ? null : "Board is not full.";
+  }
   const mark = seat === 1 ? "X" : "O";
   const lines = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -277,55 +306,27 @@ export function validateCheckers(
   return null;
 }
 
-const CUBE_COLORS = new Set(["W", "Y", "G", "B", "R", "O"]);
-
-function cubeIsSolved(cube: unknown): boolean {
-  if (!Array.isArray(cube) || cube.length !== 26) return false;
-  // Face normals: +x -x +y -y +z -z
-  const normals: [number, number, number][] = [
-    [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
-  ];
-  for (let face = 0; face < 6; face++) {
-    const n = normals[face];
-    const axis = n.findIndex(c => c !== 0);
-    const layer = n[axis];
-    const stickers: unknown[] = [];
-    for (const cubie of cube) {
-      if (!cubie || typeof cubie !== "object") return false;
-      const { pos, colors } = cubie as { pos?: unknown; colors?: unknown };
-      if (!Array.isArray(pos) || pos.length !== 3) return false;
-      if (!Array.isArray(colors) || colors.length !== 6) return false;
-      if ((pos as number[])[axis] !== layer) continue;
-      stickers.push(colors[face]);
-    }
-    if (stickers.length !== 9) return false;
-    const first = stickers[0];
-    if (first === null || !CUBE_COLORS.has(first as string)) return false;
-    if (stickers.some(s => s !== first)) return false;
-  }
-  return true;
-}
-
-/** Cube Twist: cubie array; winner requires a solved cube. */
+/**
+ * Cube Twist race: the submitted `cube` must be exactly one quarter-turn
+ * away from the mover's stored cube; a win claim requires it solved.
+ * There is no turn — both players race their own copy of the scramble.
+ */
 export function validateCubeTwist(
   boardState: unknown,
   winner: unknown,
   seat: Seat,
+  opts: ValidateOpts = {},
 ): string | null {
   if (!boardState || typeof boardState !== "object") return "Missing board state.";
   const { cube, moveCount } = boardState as { cube?: unknown; moveCount?: unknown };
-  if (!Array.isArray(cube) || cube.length !== 26) return "Invalid cube.";
-  for (const cubie of cube) {
-    if (!cubie || typeof cubie !== "object") return "Invalid cubie.";
-    const { pos, colors } = cubie as { pos?: unknown; colors?: unknown };
-    if (!Array.isArray(pos) || pos.length !== 3) return "Invalid cubie.";
-    if (!Array.isArray(colors) || colors.length !== 6) return "Invalid cubie.";
-    for (const c of colors) {
-      if (c !== null && !CUBE_COLORS.has(c as string)) return "Invalid cubie color.";
-    }
-  }
-  if (moveCount !== undefined && (!isInt(moveCount) || moveCount < 0 || moveCount > 500)) {
+  if (!isCubeShape(cube)) return "Invalid cube.";
+  if (moveCount !== undefined && (!isInt(moveCount) || moveCount < 0 || moveCount > 2000)) {
     return "Invalid move count.";
+  }
+  const prev = opts.previousBoardState as { cubes?: Record<string, Cube> } | null | undefined;
+  const prevCube = prev?.cubes?.[String(seat)];
+  if (isCubeShape(prevCube) && !isOneCubeTwist(prevCube, cube)) {
+    return "Not a single legal twist.";
   }
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
@@ -334,9 +335,8 @@ export function validateCubeTwist(
   return null;
 }
 
-const LUDO_HOME = 54;
-
-/** Ludo: seat-indexed relative piece arrays; win = all four home. */
+/** Ludo: seat-indexed relative piece arrays; win = all four home. The
+ *  result must be a legal consequence of the server-issued roll. */
 export function validateLudo(
   boardState: unknown,
   winner: unknown,
@@ -344,10 +344,9 @@ export function validateLudo(
   opts: ValidateOpts = {},
 ): string | null {
   if (!boardState || typeof boardState !== "object") return "Missing board state.";
-  const { pieces, lastRoll, turnSeat } = boardState as {
+  const { pieces, lastRoll } = boardState as {
     pieces?: unknown;
     lastRoll?: unknown;
-    turnSeat?: unknown;
   };
   const n = opts.playerCount ?? (Array.isArray(pieces) ? pieces.length : 0);
   if (!Array.isArray(pieces) || pieces.length < 2 || pieces.length > 4) return "Invalid pieces.";
@@ -358,11 +357,18 @@ export function validateLudo(
       if (!isInt(p) || p < -1 || p > LUDO_HOME) return "Invalid piece position.";
     }
   }
-  if (lastRoll !== undefined && (!isInt(lastRoll) || lastRoll < 1 || lastRoll > 6)) {
+  if (!isInt(lastRoll) || lastRoll < 1 || lastRoll > 6) {
     return "Invalid dice roll.";
   }
-  if (turnSeat !== undefined && (!isInt(turnSeat) || turnSeat < 1 || turnSeat > pieces.length)) {
-    return "Invalid turn seat.";
+  // Every piece move must be the legal result of the issued roll.
+  const prev = opts.previousBoardState as { pieces?: unknown } | null | undefined;
+  const prevPieces = Array.isArray(prev?.pieces)
+    ? (prev!.pieces as number[][])
+    : Array.from({ length: n }, () => [-1, -1, -1, -1]);
+  if (prevPieces.length === pieces.length && seat - 1 < pieces.length) {
+    if (!isLegalLudoResult(prevPieces, pieces as number[][], seat - 1, lastRoll)) {
+      return "Illegal ludo move.";
+    }
   }
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
@@ -372,35 +378,91 @@ export function validateLudo(
   return null;
 }
 
-/** UNO: hands map; winner's hand must be empty. */
+/**
+ * UNO: a regular move plays exactly one card. The new discard top must be
+ * a card from the mover's stored hand, legally playable on the previous
+ * top card, and the submitted hand must equal stored minus that card.
+ * Draws, passes, and deals are action moves handled in multiplayer.ts.
+ */
 export function validateUno(
   boardState: unknown,
   winner: unknown,
   seat: Seat,
+  opts: ValidateOpts = {},
 ): string | null {
   if (!boardState || typeof boardState !== "object") return "Missing board state.";
-  const { hands, discard } = boardState as { hands?: unknown; discard?: unknown };
+  const { hands, discard, color } = boardState as {
+    hands?: unknown;
+    discard?: unknown;
+    color?: unknown;
+  };
   if (!hands || typeof hands !== "object") return "Missing hands.";
-  const handMap = hands as Record<string, unknown>;
-  for (const key of Object.keys(handMap)) {
-    if (!Array.isArray(handMap[key])) return "Invalid hand.";
+  if (!Array.isArray(discard) || discard.length < 1) return "Invalid discard.";
+
+  const prev = opts.previousBoardState as {
+    hands?: Record<string, UnoCard[]>;
+    discard?: UnoCard[];
+    color?: UnoCard["color"];
+  } | null | undefined;
+  const storedHand = prev?.hands?.[String(seat)];
+  const prevDiscard = prev?.discard;
+  if (!Array.isArray(storedHand) || !Array.isArray(prevDiscard)) {
+    return "Game not dealt.";
   }
-  if (discard !== undefined && !Array.isArray(discard)) return "Invalid discard.";
+
+  const submittedHand = (hands as Record<string, unknown>)[String(seat)];
+  if (!Array.isArray(submittedHand) || !submittedHand.every(isUnoCard)) return "Invalid hand.";
+
+  // Discard grew by exactly one card, appended.
+  if (!discard.every(isUnoCard)) return "Invalid discard.";
+  if (discard.length !== prevDiscard.length + 1) return "Invalid discard.";
+  for (let i = 0; i < prevDiscard.length; i++) {
+    const a = prevDiscard[i] as UnoCard;
+    const b = discard[i] as UnoCard;
+    if (a.id !== b.id) return "Discard history changed.";
+  }
+  const played = discard[discard.length - 1] as UnoCard;
+  if (!isUnoCard(played)) return "Invalid card.";
+
+  // The played card must come from the mover's stored hand, and the new
+  // hand must equal the old one minus exactly that card (compared by id).
+  const remaining = storedHand.map(c => c.id);
+  const playIdx = remaining.indexOf(played.id);
+  if (playIdx === -1) return "Card not in hand.";
+  remaining.splice(playIdx, 1);
+  const submittedIds = submittedHand.map(c => c.id).sort((a, b) => a - b);
+  const expectedIds = [...remaining].sort((a, b) => a - b);
+  if (submittedIds.length !== expectedIds.length || submittedIds.some((id, i) => id !== expectedIds[i])) {
+    return "Hand does not match play.";
+  }
+
+  const prevTop = prevDiscard[prevDiscard.length - 1];
+  const prevColor = (prev?.color ?? "red") as (typeof UNO_COLORS)[number];
+  if (!unoCanPlay(played, prevTop, prevColor)) return "Card is not playable.";
+
+  if (!(UNO_COLORS as readonly string[]).includes(color as string)) return "Invalid color.";
+  // Non-wild cards must keep their own color as the active color.
+  if (played.type !== "wild" && played.type !== "wild4" && color !== played.color) {
+    return "Invalid color.";
+  }
+
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
   if (winner === undefined || winner === 0) return null;
-  const winnerHand = handMap[String(seat)];
-  if (!Array.isArray(winnerHand) || winnerHand.length !== 0) {
-    return "Winner hand is not empty.";
-  }
+  if (submittedHand.length !== 0) return "Winner hand is not empty.";
   return null;
 }
 
-/** Scrabble: board + scores; winner must hold the highest positive score. */
+/**
+ * Scrabble: the board may only gain tiles; the mover's submitted rack plus
+ * the newly placed letters must equal their stored rack (the server then
+ * refills from the hidden pool); only the mover's score may change.
+ */
 export function validateScrabble(
   boardState: unknown,
   winner: unknown,
   seat: Seat,
+  opts: ValidateOpts = {},
 ): string | null {
   if (!boardState || typeof boardState !== "object") return "Missing board state.";
   const { board, scores, racks } = boardState as {
@@ -408,26 +470,168 @@ export function validateScrabble(
     scores?: unknown;
     racks?: unknown;
   };
-  if (!Array.isArray(board)) return "Invalid board.";
+  if (!Array.isArray(board) || board.length !== SCRABBLE_BOARD_SIZE) return "Invalid board.";
+  for (const row of board) {
+    if (!Array.isArray(row) || row.length !== SCRABBLE_BOARD_SIZE) return "Invalid board.";
+    for (const cell of row) {
+      if (cell !== null && !isScrabbleLetter(cell)) return "Invalid tile.";
+    }
+  }
   if (!Array.isArray(scores) || scores.length < 2) return "Invalid scores.";
   for (const s of scores) {
     if (typeof s !== "number" || !Number.isFinite(s) || s < 0 || s > 10_000) {
       return "Invalid score.";
     }
   }
-  if (racks !== undefined) {
-    if (!Array.isArray(racks) || racks.length !== scores.length) return "Invalid racks.";
+  if (!Array.isArray(racks) || racks.length !== scores.length) return "Invalid racks.";
+
+  const prev = opts.previousBoardState as {
+    board?: (string | null)[][];
+    racks?: string[][];
+    scores?: number[];
+  } | null | undefined;
+
+  if (!Array.isArray(prev?.board) || !Array.isArray(prev?.racks) || !Array.isArray(prev?.scores)) {
+    return "Game not dealt.";
   }
+
+  const idx = seat - 1;
+  if (idx < 0 || idx >= prev.racks.length) return "Invalid seat.";
+
+  // Board is append-only: existing tiles can never move or disappear.
+  const placed: string[] = [];
+  const prevBoard = prev.board as (string | null)[][];
+  for (let r = 0; r < SCRABBLE_BOARD_SIZE; r++) {
+    for (let c = 0; c < SCRABBLE_BOARD_SIZE; c++) {
+      const before = prevBoard[r]?.[c] ?? null;
+      const after = (board as (string | null)[][])[r][c];
+      if (before !== null && before !== after) return "Board history changed.";
+      if (before === null && after !== null) placed.push(after as string);
+    }
+  }
+
+  // The mover's rack minus what they placed is what remains. A pass
+  // (placed = []) therefore requires an unchanged rack.
+  const myRack = (racks as unknown[])[idx];
+  if (!Array.isArray(myRack) || !myRack.every(isScrabbleLetter)) return "Invalid rack.";
+  const count = (arr: string[]) => {
+    const m = new Map<string, number>();
+    for (const l of arr) m.set(l, (m.get(l) ?? 0) + 1);
+    return m;
+  };
+  const expected = count(prev.racks[idx]);
+  for (const l of placed) {
+    const n = expected.get(l) ?? 0;
+    if (n === 0) return "Placed tile not in rack.";
+    expected.set(l, n - 1);
+  }
+  const expectedRack: string[] = [];
+  for (const [l, n] of expected) for (let i = 0; i < n; i++) expectedRack.push(l);
+  const have = count(myRack as string[]);
+  for (const [l, n] of count(expectedRack)) {
+    if (have.get(l) !== n) return "Rack does not match play.";
+  }
+
+  // Only the mover's score may change, by a sane amount.
+  for (let i = 0; i < scores.length; i++) {
+    const delta = (scores as number[])[i] - (prev.scores[i] ?? 0);
+    if (i === idx) {
+      if (delta < 0 || delta > 1000) return "Invalid score change.";
+    } else if (delta !== 0) {
+      return "Only the mover's score may change.";
+    }
+  }
+
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
   if (winner === undefined || winner === 0) return null;
   // Client seats are 0-indexed in scores; winner is 1-indexed playerNumber.
-  const idx = seat - 1;
-  if (idx < 0 || idx >= scores.length) return "Invalid winner seat.";
   const myScore = scores[idx] as number;
   if (myScore <= 0) return "Winner score too low.";
   const best = Math.max(...(scores as number[]));
   if (myScore < best) return "Winner does not lead on score.";
+  return null;
+}
+
+/** Snakes & Ladders: positions must equal resolve(prev + server roll). */
+export function validateSnakesLadders(
+  boardState: unknown,
+  winner: unknown,
+  seat: Seat,
+  opts: ValidateOpts = {},
+): string | null {
+  if (!boardState || typeof boardState !== "object") return "Missing board state.";
+  const { positions, lastRoll } = boardState as {
+    positions?: unknown;
+    lastRoll?: unknown;
+  };
+  const n = opts.playerCount ?? (Array.isArray(positions) ? positions.length : 2);
+  if (!Array.isArray(positions) || positions.length !== n) return "Invalid positions.";
+  for (const p of positions) {
+    if (!isInt(p) || p < 0 || p > SNL_BOARD_SIZE) return "Invalid position.";
+  }
+  if (!isInt(lastRoll) || lastRoll < 1 || lastRoll > 6) return "Invalid dice roll.";
+
+  const prev = opts.previousBoardState as { positions?: unknown } | null | undefined;
+  const prevPositions = Array.isArray(prev?.positions)
+    ? (prev!.positions as number[])
+    : Array.from({ length: n }, () => 0);
+  if (prevPositions.length === positions.length && seat - 1 < positions.length) {
+    if (!isLegalSnakesResult(prevPositions, positions as number[], seat - 1, lastRoll)) {
+      return "Illegal move.";
+    }
+  }
+
+  const foreign = rejectForeignWinner(winner, seat);
+  if (foreign) return foreign;
+  if (winner === undefined || winner === 0) return null;
+  if ((positions as number[])[seat - 1] < SNL_BOARD_SIZE) return "Not at square 100.";
+  return null;
+}
+
+/**
+ * Bingo: the called list may only grow (and only the host may grow it);
+ * a win claim must carry the player's card and marks, and the marks must
+ * prove a line from called numbers.
+ */
+export function validateBingo(
+  boardState: unknown,
+  winner: unknown,
+  seat: Seat,
+  opts: ValidateOpts = {},
+): string | null {
+  if (!boardState || typeof boardState !== "object") return "Missing board state.";
+  const { called, card, marks } = boardState as {
+    called?: unknown;
+    card?: unknown;
+    marks?: unknown;
+  };
+  if (!Array.isArray(called) || called.length > 75) return "Invalid called list.";
+  for (const c of called) {
+    if (!isInt(c) || c < 1 || c > 75) return "Invalid call.";
+  }
+  if (new Set(called).size !== called.length) return "Duplicate calls.";
+
+  const prev = opts.previousBoardState as { called?: unknown } | null | undefined;
+  const prevCalled = Array.isArray(prev?.called) ? (prev!.called as number[]) : [];
+  if (
+    (called as number[]).length < prevCalled.length ||
+    !prevCalled.every((v, i) => (called as number[])[i] === v)
+  ) {
+    return "Called history changed.";
+  }
+  // Non-host seats may claim a win but may never add calls.
+  if (seat !== 1 && (called as number[]).length !== prevCalled.length) {
+    return "Only the host calls.";
+  }
+
+  const foreign = rejectForeignWinner(winner, seat);
+  if (foreign) return foreign;
+  if (winner === undefined || winner === 0) return null;
+  if (!isBingoCard(card) || !isBingoMarks(marks)) return "Missing card proof.";
+  if (!isProvableBingoWin(card, marks, called as number[])) {
+    return "Card does not show a win.";
+  }
   return null;
 }
 
@@ -441,6 +645,8 @@ const VALIDATED_GAMES = new Set([
   "ludo",
   "uno",
   "scrabble",
+  "bingo",
+  "snakes-ladders",
 ]);
 
 export function validateMoveForGame(
@@ -467,13 +673,17 @@ export function validateMoveForGame(
     case "checkers":
       return validateCheckers(boardState, winner, seat);
     case "cube-twist":
-      return validateCubeTwist(boardState, winner, seat);
+      return validateCubeTwist(boardState, winner, seat, opts);
     case "ludo":
       return validateLudo(boardState, winner, seat, opts);
+    case "snakes-ladders":
+      return validateSnakesLadders(boardState, winner, seat, opts);
     case "uno":
-      return validateUno(boardState, winner, seat);
+      return validateUno(boardState, winner, seat, opts);
     case "scrabble":
-      return validateScrabble(boardState, winner, seat);
+      return validateScrabble(boardState, winner, seat, opts);
+    case "bingo":
+      return validateBingo(boardState, winner, seat, opts);
     default:
       return null;
   }

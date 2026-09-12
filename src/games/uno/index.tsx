@@ -69,29 +69,21 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
     };
   }, []);
 
-  // Online: host seeds initial state once
+  // Online: host asks the server to deal — no client ever sees the deck
+  // order or the opponent's cards.
   const seededRef = useRef(false);
   useEffect(() => {
     if (!isOnline || !onMultiplayerMove || !isHost || seededRef.current) return;
     const bs = multiplayerState?.boardState as { hands?: unknown } | null | undefined;
     if (bs && bs.hands) return;
     seededRef.current = true;
-    const fresh = dealInitial();
-    onMultiplayerMove({
-      boardState: {
-        hands: { [1]: fresh.pHand, [2]: fresh.aHand },
-        deck: fresh.deck,
-        discard: fresh.discard,
-        color: fresh.color,
-        currentPlayer: 1,
-        // Dealing is not a turn. Without turnSeat the server rotates to
-        // seat 2 while boardState still says seat 1, deadlocking the game.
-        turnSeat: 1,
-      },
-    });
+    onMultiplayerMove({ action: 'deal' });
   }, [isOnline, onMultiplayerMove, isHost, multiplayerState]);
 
-  // Online: reconcile from server boardState
+  // Online: reconcile from server boardState. Other hands and the deck
+  // arrive as {hidden:true} placeholders — only their length is real.
+  const passScheduledRef = useRef(false);
+  const drewRef = useRef(false);
   useEffect(() => {
     if (!isOnline || !multiplayerState) return;
     const bs = multiplayerState.boardState as {
@@ -100,6 +92,7 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
       discard?: UnoCard[];
       color?: UnoColor;
       currentPlayer?: number;
+      drew?: number;
     } | null | undefined;
     if (!bs || !bs.hands) return;
     const myHand = bs.hands[String(mySeat)] || [];
@@ -110,13 +103,35 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
     if (bs.discard) setDiscardPile(bs.discard);
     if (bs.color) setCurrentColor(bs.color);
     setIsPlayerTurn(bs.currentPlayer === mySeat);
+    drewRef.current = bs.drew === mySeat;
+
+    // After our draw resolves, either play the drawn card or pass.
+    if (bs.drew === mySeat && bs.currentPlayer === mySeat && myHand.length > 0) {
+      if (!passScheduledRef.current) {
+        passScheduledRef.current = true;
+        const drawn = myHand[myHand.length - 1];
+        const top = bs.discard?.[bs.discard.length - 1];
+        const col = bs.color;
+        if (drawn && top && col && !canPlay(drawn, top, col)) {
+          schedule(() => {
+            setMessage("No match. Opponent's turn.");
+            onMultiplayerMove?.({ action: 'pass' });
+          }, 700);
+        } else {
+          setMessage('You drew a playable card — tap it to play, or the deck to pass is automatic if it cannot be played.');
+        }
+      }
+    } else {
+      passScheduledRef.current = false;
+    }
+
     // Winner check
     if (multiplayerState.winner && !endedRef.current) {
       endedRef.current = true;
       const iWon = multiplayerState.winner === mySeat;
       onEnd({ score: iWon ? 200 : 0, stars: iWon ? 3 : 1, summary: iWon ? 'You won UNO!' : 'Opponent won.' });
     }
-  }, [isOnline, multiplayerState, mySeat, oppSeat, onEnd]);
+  }, [isOnline, multiplayerState, mySeat, oppSeat, onEnd, onMultiplayerMove, schedule]);
 
   const finishMatch = useCallback((outcome: 'win' | 'lose') => {
     if (endedRef.current) return;
@@ -323,28 +338,38 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
     setHighlightCard(card.id);
     schedule(() => setHighlightCard(null), 600);
 
+    // Online: submit only our own hand + the new discard top. The server
+    // validates the play against its copy of our hand, deals +2/+4
+    // penalties to the opponent itself, and decides whose turn is next.
+    if (isOnline && onMultiplayerMove) {
+      const keepsTurn =
+        card.symbol === 'skip' || card.symbol === 'reverse' ||
+        card.symbol === 'draw2' || card.type === 'wild4';
+      const won = newPlayerHand.length === 0;
+      setPlayerHand(newPlayerHand);
+      setDiscardPile(newDiscard);
+      setCurrentColor(color);
+      setIsPlayerTurn(keepsTurn && !won);
+      setMessage(keepsTurn ? 'Skipped them — go again!' : "Opponent's turn.");
+      onMultiplayerMove({
+        boardState: {
+          hands: { [mySeat]: newPlayerHand },
+          discard: newDiscard,
+          color,
+        },
+        winner: won ? mySeat : undefined,
+      });
+      if (won && !endedRef.current) {
+        endedRef.current = true;
+        onEnd({ score: 200, stars: 3, summary: 'You won UNO!' });
+      }
+      return;
+    }
+
     if (newPlayerHand.length === 0) {
       setPlayerHand(newPlayerHand);
       setDiscardPile(newDiscard);
       setCurrentColor(color);
-      if (isOnline && onMultiplayerMove && multiplayerState) {
-        onMultiplayerMove({
-          boardState: {
-            hands: { [mySeat]: newPlayerHand, [oppSeat]: aiHand },
-            deck,
-            discard: newDiscard,
-            color,
-            currentPlayer: oppSeat,
-            turnSeat: oppSeat,
-          },
-          winner: mySeat,
-        });
-        if (!endedRef.current) {
-          endedRef.current = true;
-          onEnd({ score: 200, stars: 3, summary: 'You won UNO!' });
-        }
-        return;
-      }
       handleEndRound('player');
       return;
     }
@@ -357,23 +382,6 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
     setCurrentColor(effect.color);
     setDeck(effect.deck);
     setMessage(effect.message);
-
-    if (isOnline && onMultiplayerMove) {
-      // Online: dispatch and stop; opponent plays via their own client
-      const nextPlayer = effect.skip ? mySeat : oppSeat;
-      onMultiplayerMove({
-        boardState: {
-          hands: { [mySeat]: effect.pHand, [oppSeat]: effect.aHand },
-          deck: effect.deck,
-          discard: effect.discard,
-          color: effect.color,
-          currentPlayer: nextPlayer,
-          turnSeat: nextPlayer,
-        },
-      });
-      setIsPlayerTurn(effect.skip);
-      return;
-    }
 
     if (effect.skip) {
       setMessage(effect.message + ' Your turn again!');
@@ -392,6 +400,14 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
   const handleDraw = () => {
     if (!isPlayerTurn || phase !== 'playing' || aiThinking) return;
 
+    if (isOnline && onMultiplayerMove) {
+      // The server draws for us and appends the card to our hand; the
+      // reconcile effect then decides whether to pass. Tapping the deck
+      // a second time (already drew) passes the turn.
+      onMultiplayerMove({ action: drewRef.current ? 'pass' : 'draw' });
+      return;
+    }
+
     const { drawn, remaining } = drawCards(deck, 1);
     if (drawn.length === 0) return;
 
@@ -403,21 +419,8 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
     if (canPlay(drawnCard, topCard, currentColor)) {
       setMessage(`You drew ${cardLabel(drawnCard)} — you can play it!`);
     } else {
-      setMessage(isOnline ? "No match. Opponent's turn." : "No match. AI's turn.");
+      setMessage("No match. AI's turn.");
       setIsPlayerTurn(false);
-      if (isOnline && onMultiplayerMove) {
-        onMultiplayerMove({
-          boardState: {
-            hands: { [mySeat]: newPlayerHand, [oppSeat]: aiHand },
-            deck: remaining,
-            discard: discardPile,
-            color: currentColor,
-            currentPlayer: oppSeat,
-            turnSeat: oppSeat,
-          },
-        });
-        return;
-      }
       doAiTurn(remaining, discardPile, currentColor, aiHand, newPlayerHand);
     }
   };

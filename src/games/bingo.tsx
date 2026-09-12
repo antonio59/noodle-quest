@@ -149,6 +149,18 @@ function BingoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
     if (isOnline && !isHost) return; // Non-host observes server call stream
 
     const timer = setTimeout(() => {
+      if (isOnline && onMultiplayerMove) {
+        // The server owns the call order — it draws the next number from a
+        // shuffled pool and broadcasts it. The reconcile effect updates
+        // `called`, which re-arms this timer.
+        if (called.length >= 75) {
+          setCalling(false);
+          return;
+        }
+        onMultiplayerMove({ action: 'call' });
+        return;
+      }
+
       const idx = called.length;
       const pool = poolRef.current;
 
@@ -164,11 +176,6 @@ function BingoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
       const nextCalled = [...called, num];
       setCalled(nextCalled);
       setTotalCalled(prev => prev + 1);
-
-      if (isOnline && onMultiplayerMove) {
-        onMultiplayerMove({ boardState: { called: nextCalled } });
-        return;
-      }
 
       const chance = difficulty === 'easy' ? 0.7 : difficulty === 'medium' ? 0.85 : 0.95;
       const nextAi = aiMarkedRef.current.map(r => [...r]);
@@ -211,7 +218,11 @@ function BingoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
       onProgress(1);
 
       if (isOnline && onMultiplayerMove && multiplayerState) {
-        onMultiplayerMove({ boardState: { called }, winner: multiplayerState.playerNumber });
+        // The server verifies the claim against our card + marks.
+        onMultiplayerMove({
+          boardState: { called, card: playerCard, marks: next },
+          winner: multiplayerState.playerNumber,
+        });
         if (!endedRef.current) {
           endedRef.current = true;
           onEnd({ score: 150, stars: 3, summary: 'You got BINGO!' });

@@ -173,7 +173,22 @@ export function bestRod(board: Board, player: Player, difficulty: AILevel): Rod 
 
   const { depth, blunderChance } = AI_CONFIG[difficulty];
   if (Math.random() < blunderChance) {
-    return rods[Math.floor(Math.random() * rods.length)];
+    // A blunder is a mediocre move, not a suicidal one: never pick a rod
+    // that hands the opponent an immediate win (unless every rod does).
+    const safe = rods.filter(rod => {
+      const y = drop(b, rod.x, rod.z, player);
+      let loses = false;
+      for (const or of legalRods(b)) {
+        const oy = drop(b, or.x, or.z, other(player));
+        if (winningLine(b, other(player)) !== null) loses = true;
+        b[idx(or.x, oy, or.z)] = 0;
+        if (loses) break;
+      }
+      b[idx(rod.x, y, rod.z)] = 0;
+      return !loses;
+    });
+    const pool = safe.length > 0 ? safe : rods;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   let best = rods[0];

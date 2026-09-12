@@ -118,13 +118,18 @@ describe("multiplayer", () => {
     const join = await t.mutation(api.multiplayer.joinSession, { inviteCode: invite.inviteCode!, sessionToken: guest.sessionToken });
     expect(join.sessionId).toBeDefined();
 
+    const board = Array.from({ length: 6 }, () => Array(7).fill(null));
+    board[5][1] = "red";
+
     // It's seat 1's turn: the guest (seat 2) cannot move, the host can
     const wrongTurn = await t.mutation(api.multiplayer.makeMove, {
-      sessionId: join.sessionId!, sessionToken: guest.sessionToken, move: { col: 1 },
+      sessionId: join.sessionId!, sessionToken: guest.sessionToken,
+      move: { boardState: { board } },
     });
     expect(wrongTurn.error).toBe("Not your turn.");
     const move = await t.mutation(api.multiplayer.makeMove, {
-      sessionId: join.sessionId!, sessionToken: host.sessionToken, move: { col: 1 },
+      sessionId: join.sessionId!, sessionToken: host.sessionToken,
+      move: { boardState: { board } },
     });
     expect(move.ok).toBe(true);
   });
@@ -139,7 +144,7 @@ describe("multiplayer", () => {
       gameId: "checkers", sessionToken: host.sessionToken, toId: invitee.playerId,
     });
     const denied = await t.mutation(api.multiplayer.declineInvite, { inviteCode: invite.inviteCode!, sessionToken: other.sessionToken });
-    expect(denied.error).toBe("This invite isn't for you.");
+    expect(denied.error).toBe("You can't decline this invite.");
     const ok = await t.mutation(api.multiplayer.declineInvite, { inviteCode: invite.inviteCode!, sessionToken: invitee.sessionToken });
     expect(ok.ok).toBe(true);
   });

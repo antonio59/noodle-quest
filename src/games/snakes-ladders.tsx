@@ -93,27 +93,69 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
   }, []);
 
   // Online sync: read positions[0]=seat1, positions[1]=seat2 and whose turn.
+  // Dice come from the server: `action:'roll'` stores pendingRoll, then the
+  // animated move commits positions + lastRoll to consume it.
+  const positionsRef = useRef<number[]>([0, 0]);
+  const processingRollRef = useRef(false);
   useEffect(() => {
     if (!isOnline) return;
-    const bs = multiplayerState.boardState as { positions?: [number, number]; lastRoll?: number } | null | undefined;
-    if (bs && Array.isArray(bs.positions)) {
-      setPlayerPos(bs.positions[mySeat - 1] ?? 0);
-      setAiPos(bs.positions[mySeat === 1 ? 1 : 0] ?? 0);
-      setTurn(multiplayerState.currentPlayer === mySeat ? 'player' : 'ai');
-      if (typeof bs.lastRoll === 'number') setDie(bs.lastRoll);
-      const myPos = bs.positions[mySeat - 1] ?? 0;
-      const oppPos = bs.positions[mySeat === 1 ? 1 : 0] ?? 0;
-      if (!endedRef.current && (myPos >= BOARD_SIZE || oppPos >= BOARD_SIZE)) {
-        endedRef.current = true;
-        const won = myPos >= BOARD_SIZE;
-        onEnd({
-          score: won ? 80 : 10,
-          stars: won ? 3 : 1,
-          summary: won ? 'You reached 100 first!' : 'Opponent reached 100 first.',
-        });
+    const bs = multiplayerState.boardState as {
+      positions?: number[];
+      lastRoll?: number;
+      pendingRoll?: { seat: number; value: number };
+    } | null | undefined;
+    if (!bs) return;
+    const positions = Array.isArray(bs.positions) && bs.positions.length >= 2
+      ? bs.positions
+      : [0, 0];
+    positionsRef.current = [...positions];
+    setPlayerPos(positions[mySeat - 1] ?? 0);
+    setAiPos(positions[mySeat === 1 ? 1 : 0] ?? 0);
+    setTurn(multiplayerState.currentPlayer === mySeat ? 'player' : 'ai');
+    if (typeof bs.lastRoll === 'number') setDie(bs.lastRoll);
+
+    // My pending server roll — animate it, then commit the result.
+    const pending = bs.pendingRoll;
+    if (pending && pending.seat === mySeat && !endedRef.current && !gameOver) {
+      if (processingRollRef.current) return;
+      processingRollRef.current = true;
+      const d = pending.value;
+      setDie(d);
+      const start = positions[mySeat - 1] ?? 0;
+      if (start + d > BOARD_SIZE) {
+        onMessage(`Rolled ${d} — need exact roll to finish!`);
+        commitMove(start, d);
+      } else {
+        moveToken(start, d, setPlayerPos, 'You', (finalPos) => commitMove(finalPos, d));
       }
+    } else {
+      processingRollRef.current = false;
     }
-  }, [isOnline, multiplayerState, mySeat, onEnd]);
+
+    const myPos = positions[mySeat - 1] ?? 0;
+    const oppPos = positions[mySeat === 1 ? 1 : 0] ?? 0;
+    if (!endedRef.current && (myPos >= BOARD_SIZE || oppPos >= BOARD_SIZE)) {
+      endedRef.current = true;
+      const won = myPos >= BOARD_SIZE;
+      onEnd({
+        score: won ? 80 : 10,
+        stars: won ? 3 : 1,
+        summary: won ? 'You reached 100 first!' : 'Opponent reached 100 first.',
+      });
+    }
+  }, [isOnline, multiplayerState, mySeat, onEnd, onMessage, gameOver]);
+
+  // Commit the resolved position; lastRoll consumes the pending server roll.
+  const commitMove = (myNewPos: number, d: number) => {
+    const positions = [...positionsRef.current];
+    while (positions.length < 2) positions.push(0);
+    positions[mySeat - 1] = myNewPos;
+    const iWon = myNewPos >= BOARD_SIZE;
+    onMultiplayerMove?.({
+      boardState: { positions, lastRoll: d },
+      winner: iWon ? mySeat : undefined,
+    });
+  };
 
   // Resolve snake/ladder chains (a ladder landing on a snake or vice versa)
   const resolveSquare = (pos: number): number => {
@@ -223,30 +265,15 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
 
   const handleRoll = () => {
     if (endedRef.current || gameOver || turn !== 'player' || animating) return;
-    const d = rollDie();
-    setDie(d);
 
     if (isOnline) {
-      const overshoot = playerPos + d > BOARD_SIZE;
-      const finalPos = overshoot ? playerPos : resolveSquare(playerPos + d);
-      const dispatch = (animatedPos: number) => {
-        const positions: [number, number] = mySeat === 1
-          ? [animatedPos, aiPos]
-          : [aiPos, animatedPos];
-        const iWon = animatedPos >= BOARD_SIZE;
-        onMultiplayerMove?.({
-          boardState: { positions, lastRoll: d },
-          winner: iWon ? mySeat : undefined,
-        });
-      };
-      if (overshoot) {
-        onMessage(`Rolled ${d} — need exact roll to finish!`);
-        dispatch(playerPos);
-        return;
-      }
-      moveToken(playerPos, d, setPlayerPos, 'You', () => dispatch(finalPos));
+      // Server rolls; the reconcile effect animates + commits the result.
+      onMultiplayerMove?.({ action: 'roll' });
       return;
     }
+
+    const d = rollDie();
+    setDie(d);
 
     if (playerPos + d > BOARD_SIZE) {
       onMessage(`Rolled ${d} — need exact roll to finish!`);

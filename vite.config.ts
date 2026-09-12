@@ -25,8 +25,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
     css: false,
-    // Playwright owns e2e/ — keep vitest out of it
-    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
+    // Playwright owns e2e/ — keep vitest out of it. Also skip stale test
+    // copies inside .claude worktrees so old snapshots can't run.
+    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**', '**/.claude/**'],
     // convex-test ships TS that must be transformed by Vite
     server: { deps: { inline: ['convex-test'] } },
     coverage: {

@@ -172,7 +172,24 @@ export function bestMove(board: Board, color: Color, difficulty: AILevel): numbe
 
   const { depth, blunderChance } = AI_CONFIG[difficulty];
   if (Math.random() < blunderChance) {
-    return moves[Math.floor(Math.random() * moves.length)];
+    // A blunder is a mediocre move, not a suicidal one: never pick a column
+    // that hands the opponent an immediate win (unless every column does).
+    const safe = moves.filter(c => {
+      const r = landingRow(b, c);
+      b[r][c] = color;
+      let loses = false;
+      for (const oc of legalMoves(b)) {
+        const or = landingRow(b, oc);
+        b[or][oc] = other(color);
+        if (checkWin(b, or, oc, other(color))) loses = true;
+        b[or][oc] = null;
+        if (loses) break;
+      }
+      b[r][c] = null;
+      return !loses;
+    });
+    const pool = safe.length > 0 ? safe : moves;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   let bestCol = moves[0];
