@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Send, Smile, Image, AtSign, X, Search, MessageCircle, Zap, Reply } from 'lucide-react';
+import { Send, Smile, Image, AtSign, X, Search, MessageCircle, Zap, Reply, ArrowDown } from 'lucide-react';
 import { getGameName } from '@/lib/game-registry';
 
 const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY as string | undefined;
@@ -184,6 +184,12 @@ export function Feed() {
   const [replyTo, setReplyTo] = useState<any | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
+  const feedScrollRef = useRef<HTMLDivElement>(null);
+  // Auto-scroll only follows new messages while the reader is parked at
+  // the bottom; scrolling up to read history pins them in place.
+  const nearBottomRef = useRef(true);
+  const lastPostCountRef = useRef(0);
+  const [newBelow, setNewBelow] = useState(0);
 
   const chatData = useQuery(
     api.feed.getChatMessages,
@@ -217,9 +223,33 @@ export function Feed() {
     }
   }, [searchResults]);
 
+  const scrollToBottom = useCallback((smooth = true) => {
+    feedEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    nearBottomRef.current = true;
+    setNewBelow(0);
+  }, []);
+
+  const handleFeedScroll = useCallback(() => {
+    const el = feedScrollRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    nearBottomRef.current = near;
+    if (near) setNewBelow(0);
+  }, []);
+
   useEffect(() => {
-    feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatData]);
+    const count = chatData?.length ?? 0;
+    const prev = lastPostCountRef.current;
+    lastPostCountRef.current = count;
+    if (count === 0) return;
+    if (prev === 0) {
+      // First load — land on the latest messages without animation.
+      scrollToBottom(false);
+    } else if (count > prev) {
+      if (nearBottomRef.current) scrollToBottom();
+      else setNewBelow(n => n + (count - prev));
+    }
+  }, [chatData, scrollToBottom]);
 
   const handleSend = async () => {
     if (!message.trim() || !player || !createPost) return;
@@ -234,6 +264,7 @@ export function Feed() {
       setShowEmoji(false);
       setShowGif(false);
       setReplyTo(null);
+      scrollToBottom();
     } catch { /* send failed */ }
   };
 
@@ -289,6 +320,7 @@ export function Feed() {
       });
       setShowGif(false); setGifQuery('');
       setReplyTo(null);
+      scrollToBottom();
     } catch { /* send failed */ }
   };
 
@@ -317,12 +349,15 @@ export function Feed() {
   };
 
   // Mark chat as read while it's on screen (drives the nav unread dot).
+  // Keyed on the newest timestamp so unrelated re-renders don't re-fire.
+  const newestChatTs = chatPosts.length > 0
+    ? Math.max(...chatPosts.map((p: any) => p.createdAt ?? 0))
+    : 0;
   useEffect(() => {
-    if (tab !== 'chat' || chatPosts.length === 0) return;
-    const newest = Math.max(...chatPosts.map((p: any) => p.createdAt ?? 0));
-    localStorage.setItem('nq_chat_read', String(newest));
+    if (tab !== 'chat' || newestChatTs === 0) return;
+    localStorage.setItem('nq_chat_read', String(newestChatTs));
     window.dispatchEvent(new Event('nq-chat-read'));
-  }, [tab, chatPosts]);
+  }, [tab, newestChatTs]);
 
   return (
     <div className="h-full flex flex-col">
@@ -367,7 +402,8 @@ export function Feed() {
       <div className="h-px bg-white/5 flex-shrink-0" />
 
       {/* Feed area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 relative min-h-0">
+      <div ref={feedScrollRef} onScroll={handleFeedScroll} className="h-full overflow-y-auto">
         {tab === 'chat' && (
           chatPosts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-text-muted pb-8">
@@ -383,8 +419,13 @@ export function Feed() {
                 const isMe = post.authorName === player?.name;
                 const prev = chatPosts[idx - 1] as any;
                 const next = chatPosts[idx + 1] as any;
-                const isSameAuthorAsPrev = prev && prev.authorName === post.authorName;
-                const isSameAuthorAsNext = next && next.authorName === post.authorName;
+                // Groups also break on a >5min gap, not just author changes —
+                // a same-author burst hours apart shouldn't share one header.
+                const GROUP_GAP = 5 * 60 * 1000;
+                const isSameAuthorAsPrev = prev && prev.authorName === post.authorName
+                  && post.createdAt - prev.createdAt < GROUP_GAP;
+                const isSameAuthorAsNext = next && next.authorName === post.authorName
+                  && next.createdAt - post.createdAt < GROUP_GAP;
                 const isFirstInGroup = !isSameAuthorAsPrev;
                 const isLastInGroup = !isSameAuthorAsNext;
                 const addGap = isFirstInGroup && idx > 0;
@@ -403,13 +444,13 @@ export function Feed() {
                   <div
                     className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'} ${addGap && !newDay ? 'mt-3' : ''}`}
                   >
-                    {/* Avatar column (others only) — always reserve space, fade on grouped */}
+                    {/* Avatar column (others only) — anchored to the last
+                        bubble in a group, WhatsApp-style; space is always
+                        reserved so bubbles line up. */}
                     {!isMe && (
                       <div className="w-8 flex-shrink-0 flex items-end justify-center">
-                        {isFirstInGroup ? (
-                          <span className="text-2xl leading-none">{post.authorAvatar || '🎮'}</span>
-                        ) : (
-                          <span className="text-base leading-none opacity-30">{post.authorAvatar || '🎮'}</span>
+                        {isLastInGroup && (
+                          <span className="text-2xl leading-none pb-0.5">{post.authorAvatar || '🎮'}</span>
                         )}
                       </div>
                     )}
@@ -579,6 +620,19 @@ export function Feed() {
         )}
       </div>
 
+      {/* New-messages pill — appears when new posts land while the reader
+          is scrolled up in history. */}
+      {tab === 'chat' && newBelow > 0 && (
+        <button
+          onClick={() => scrollToBottom()}
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-accent text-bg text-xs font-bold pl-3 pr-4 py-2 rounded-full shadow-lg active:scale-95 transition-transform"
+        >
+          <ArrowDown size={13} />
+          {newBelow} new message{newBelow === 1 ? '' : 's'}
+        </button>
+      )}
+      </div>
+
       {/* Compose bar (chat only) */}
       {tab === 'chat' && (
         <div className="flex-shrink-0 bg-surface border-t border-white/5 p-3 space-y-2">
@@ -649,7 +703,8 @@ export function Feed() {
                       placeholder="Search GIFs..."
                       value={gifQuery}
                       onChange={e => setGifQuery(e.target.value)}
-                      className="flex-1 bg-transparent text-sm text-text placeholder-text-muted outline-none"
+                      enterKeyHint="search"
+                      className="flex-1 bg-transparent text-base text-text placeholder-text-muted outline-none"
                       autoFocus
                     />
                     {gifQuery && (
@@ -725,17 +780,26 @@ export function Feed() {
               </button>
             </div>
 
-            {/* Text input */}
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="Say something..."
-              value={message}
-              onChange={handleInputChange}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-              className="flex-1 bg-card rounded-2xl px-4 py-2.5 text-sm text-text placeholder-text-muted outline-none focus:ring-1 ring-accent/50 transition-all"
-              maxLength={500}
-            />
+            {/* Text input — 16px minimum so iOS doesn't auto-zoom on focus */}
+            <div className="flex-1 relative">
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Say something..."
+                value={message}
+                onChange={handleInputChange}
+                onKeyDown={e => e.key === 'Enter' && handleSend()}
+                enterKeyHint="send"
+                autoComplete="off"
+                className="w-full bg-card rounded-2xl px-4 py-2.5 text-base text-text placeholder-text-muted outline-none focus:ring-1 ring-accent/50 transition-all"
+                maxLength={500}
+              />
+              {message.length > 450 && (
+                <span className="absolute -top-5 right-2 text-[10px] font-semibold text-text-muted">
+                  {500 - message.length}
+                </span>
+              )}
+            </div>
 
             {/* Send */}
             <button

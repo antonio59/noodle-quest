@@ -203,6 +203,11 @@ button {
   50% { transform: scaleY(0.4); }
 }
 
+@keyframes breathe-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
 @keyframes progressLoop {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }

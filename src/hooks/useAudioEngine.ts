@@ -5,20 +5,48 @@ interface TrackConfig {
   bpm?: number;
 }
 
+function readStoredVolume(): number {
+  try {
+    const v = Number(localStorage.getItem('nq_volume'));
+    return Number.isFinite(v) && v > 0 ? Math.min(v, 1) : 0.8;
+  } catch { return 0.8; }
+}
+
 export function useAudioEngine() {
   const ctxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<{ stop: () => void }[]>([]);
+  // Master gain sits between every source and the destination so volume
+  // applies to whichever generator is running.
+  const masterRef = useRef<GainNode | null>(null);
+  const [volume, setVolumeState] = useState(readStoredVolume);
+  const volumeRef = useRef<number>(volume);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
 
   const getCtx = useCallback(async (): Promise<AudioContext> => {
     if (!ctxRef.current) {
       ctxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      masterRef.current = ctxRef.current.createGain();
+      masterRef.current.gain.value = volumeRef.current;
+      masterRef.current.connect(ctxRef.current.destination);
     }
     if (ctxRef.current.state === 'suspended') {
       await ctxRef.current.resume();
     }
     return ctxRef.current;
+  }, []);
+
+  // All generators route through the master gain.
+  const out = useCallback((): GainNode => masterRef.current!, []);
+
+  const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    volumeRef.current = clamped;
+    setVolumeState(clamped);
+    try { localStorage.setItem('nq_volume', String(clamped)); } catch { /* private mode */ }
+    if (masterRef.current && ctxRef.current) {
+      masterRef.current.gain.setTargetAtTime(clamped, ctxRef.current.currentTime, 0.05);
+    }
   }, []);
 
   const stopAll = useCallback(() => {
@@ -61,7 +89,7 @@ export function useAudioEngine() {
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + beatLen * 3.5);
         osc.connect(filter);
         filter.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(out());
         osc.start();
         osc.stop(ctx.currentTime + beatLen * 4);
       });
@@ -86,7 +114,7 @@ export function useAudioEngine() {
       gain.gain.value = 0.15;
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out());
       source.start();
       setTimeout(playCrackle, 100 + Math.random() * 300);
     };
@@ -110,7 +138,7 @@ export function useAudioEngine() {
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out());
       source.start();
       setTimeout(playHihat, beatLen * 2000);
     };
@@ -126,7 +154,7 @@ export function useAudioEngine() {
       gain.gain.setValueAtTime(0.2, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out());
       osc.start();
       osc.stop(ctx.currentTime + 0.2);
       setTimeout(playKick, beatLen * 4000);
@@ -139,7 +167,7 @@ export function useAudioEngine() {
 
     nodes.push({ stop: () => { running = false; } });
     return nodes;
-  }, [getCtx]);
+  }, [getCtx, out]);
 
   // Focus: slow evolving pad
   const playFocus = useCallback(async () => {
@@ -167,7 +195,7 @@ export function useAudioEngine() {
       gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 6);
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(out());
       osc.start();
       osc.stop(ctx.currentTime + 6);
       setTimeout(playPad, 4000);
@@ -176,7 +204,7 @@ export function useAudioEngine() {
     playPad();
     nodes.push({ stop: () => { running = false; } });
     return nodes;
-  }, [getCtx]);
+  }, [getCtx, out]);
 
   // Nature: filtered noise (rain/wind)
   const playNature = useCallback(async () => {
@@ -214,12 +242,12 @@ export function useAudioEngine() {
 
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(out());
     source.start();
 
     nodes.push({ stop: () => { running = false; source.stop(); lfo.stop(); } });
     return nodes;
-  }, [getCtx]);
+  }, [getCtx, out]);
 
   // Meditation: slow breathing guide tones
   const playMeditation = useCallback(async () => {
@@ -238,7 +266,7 @@ export function useAudioEngine() {
       gain1.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 4);
       gain1.gain.linearRampToValueAtTime(0, ctx.currentTime + 8);
       osc1.connect(gain1);
-      gain1.connect(ctx.destination);
+      gain1.connect(out());
       osc1.start();
       osc1.stop(ctx.currentTime + 8);
 
@@ -253,7 +281,7 @@ export function useAudioEngine() {
         gain2.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 4);
         gain2.gain.linearRampToValueAtTime(0, ctx.currentTime + 8);
         osc2.connect(gain2);
-        gain2.connect(ctx.destination);
+        gain2.connect(out());
         osc2.start();
         osc2.stop(ctx.currentTime + 8);
       }, 4000);
@@ -264,7 +292,7 @@ export function useAudioEngine() {
     breathCycle();
     nodes.push({ stop: () => { running = false; } });
     return nodes;
-  }, [getCtx]);
+  }, [getCtx, out]);
 
   const play = useCallback(async (trackId: string, config: TrackConfig) => {
     stopAll();
@@ -305,5 +333,5 @@ export function useAudioEngine() {
   // Cleanup on unmount
   useEffect(() => () => stopAll(), [stopAll]);
 
-  return { isPlaying, currentTrack, play, stop: stopAll, toggle };
+  return { isPlaying, currentTrack, play, stop: stopAll, toggle, volume, setVolume };
 }

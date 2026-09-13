@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllGames } from '@/lib/game-registry';
 import { GAME_CATEGORIES, type GameCategory } from '@/types';
-import { Heart, Search, Play, Pause, Users, Wind, Star, Sparkles } from 'lucide-react';
+import { Heart, Search, Play, Pause, Users, Wind, Star, Sparkles, Volume2, VolumeX, Moon } from 'lucide-react';
 import { RequestGameModal } from '@/components/RequestGameModal';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { TRACKS } from '@/tracks/track-list';
@@ -29,6 +29,15 @@ const TRACK_TYPE_LABELS: Record<string, string> = {
   lofi: '☕ Lo-Fi', focus: '🧠 Focus', nature: '🌿 Nature', meditation: '🧘 Meditation',
 };
 
+// Stage-1 phase timings so users know the pattern before starting (some games
+// lengthen phases at higher stages — base pattern shown).
+const BREATHE_PATTERNS: Record<string, string[]> = {
+  'box-breathing':      ['In 4s', 'Hold 4s', 'Out 4s', 'Hold 4s'],
+  'calm-breathing':     ['In 4s', 'Hold 7s', 'Out 8s'],
+  'triangle-breathing': ['In 4s', 'Hold 4s', 'Out 4s'],
+  'coherent-breathing': ['In 5s', 'Out 5s'],
+};
+
 const CATEGORY_STYLES: Record<string, { label: string; badge: string; glow: string; playBtn: string }> = {
   focus:       { label: 'Focus',       badge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',         glow: 'hover:shadow-[0_0_24px_rgba(56,189,248,0.2)]',   playBtn: 'bg-sky-500 hover:brightness-110' },
   memory:      { label: 'Memory',      badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',   glow: 'hover:shadow-[0_0_24px_rgba(240,168,58,0.22)]',  playBtn: 'bg-accent hover:brightness-110' },
@@ -37,6 +46,31 @@ const CATEGORY_STYLES: Record<string, { label: string; badge: string; glow: stri
   social:      { label: 'Social',      badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',       glow: 'hover:shadow-[0_0_24px_rgba(244,63,94,0.2)]',    playBtn: 'bg-rose-500 hover:brightness-110' },
   sequence:    { label: 'Sequence',    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', glow: 'hover:shadow-[0_0_24px_rgba(52,211,153,0.2)]', playBtn: 'bg-emerald-500 hover:brightness-110' },
 };
+
+function CardMeta({ starsEarned, bonusMultiplier, size = 'sm' }: { starsEarned: number; bonusMultiplier: number; size?: 'sm' | 'lg' }) {
+  const tier = getBonusTier(bonusMultiplier);
+  const earned = Math.min(starsEarned, 3);
+  const starSize = size === 'lg' ? 18 : 11;
+  return (
+    <div className="flex items-center justify-between gap-1 mt-2 min-h-[18px] w-full">
+      <div className="flex gap-0.5" aria-label={`${earned} of 3 stars earned`}>
+        {[1, 2, 3].map(i => (
+          <Star
+            key={i}
+            size={starSize}
+            className={i <= earned ? 'text-warning' : 'text-card-hover'}
+            fill={i <= earned ? 'currentColor' : 'none'}
+          />
+        ))}
+      </div>
+      {tier && (
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-surface ${tier.color}`}>
+          {tier.label}
+        </span>
+      )}
+    </div>
+  );
+}
 
 const TABS = [
   {
@@ -135,32 +169,6 @@ export function GameHub() {
   };
 
   const currentTab = TABS.find(t => t.id === tab) || TABS[0];
-
-  const CardMeta = ({ gameId, size = 'sm' }: { gameId: string; size?: 'sm' | 'lg' }) => {
-    const { starsEarned, bonusMultiplier } = statsFor(gameId);
-    const tier = getBonusTier(bonusMultiplier);
-    const earned = Math.min(starsEarned, 3);
-    const starSize = size === 'lg' ? 18 : 11;
-    return (
-      <div className="flex items-center justify-between gap-1 mt-2 min-h-[18px]">
-        <div className="flex gap-0.5" aria-label={`${earned} of 3 stars earned`}>
-          {[1, 2, 3].map(i => (
-            <Star
-              key={i}
-              size={starSize}
-              className={i <= earned ? 'text-warning' : 'text-card-hover'}
-              fill={i <= earned ? 'currentColor' : 'none'}
-            />
-          ))}
-        </div>
-        {tier && (
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-surface ${tier.color}`}>
-            {tier.label}
-          </span>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="h-full flex flex-col">
@@ -284,17 +292,21 @@ export function GameHub() {
                   <button
                     type="button"
                     onClick={() => navigateToGame(g.id)}
-                    className="w-full flex flex-col items-center text-center pt-6 pb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-2xl"
+                    className="w-full h-full flex flex-col items-center text-center pt-6 pb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-2xl"
                     aria-label={`Play ${g.name}`}
                   >
                     <div className="text-5xl mb-3 leading-none">{g.emoji}</div>
-                    <div className="font-bold text-sm mb-1 text-text">{g.name}</div>
-                    <div className="text-text-muted text-xs line-clamp-2 mb-2">{g.description}</div>
-                    <CardMeta gameId={g.id} size="lg" />
-                    <span className={`mt-3 ${style.playBtn} text-bg rounded-full px-5 py-2 flex items-center gap-2 font-bold text-sm`}>
-                      <Play size={16} className="fill-current" />
-                      Play
-                    </span>
+                    <div className="min-h-9 flex items-center justify-center mb-1">
+                      <span className="font-bold text-sm leading-tight text-text line-clamp-2">{g.name}</span>
+                    </div>
+                    <div className="text-text-muted text-xs leading-relaxed line-clamp-2 min-h-10 mb-2">{g.description}</div>
+                    <div className="mt-auto w-full flex flex-col items-center">
+                      <CardMeta {...statsFor(g.id)} size="lg" />
+                      <span className={`mt-3 ${style.playBtn} text-bg rounded-full px-5 py-2 flex items-center gap-2 font-bold text-sm`}>
+                        <Play size={16} className="fill-current" />
+                        Play
+                      </span>
+                    </div>
                   </button>
                 </div>
               );
@@ -361,7 +373,7 @@ export function GameHub() {
                 return (
                   <div
                     key={g.id}
-                    className="bg-card rounded-3xl p-5 flex flex-col items-center text-center border border-white/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(240,168,58,0.18)] relative overflow-hidden"
+                    className="bg-card rounded-3xl p-5 h-full flex flex-col items-center text-center border border-white/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(240,168,58,0.18)] relative overflow-hidden"
                   >
                     {/* Bonus badge top-right */}
                     {bonusTierBadge && (
@@ -380,13 +392,15 @@ export function GameHub() {
                     <div className="text-5xl mb-3 leading-none mt-2">{g.emoji}</div>
 
                     {/* Name + description */}
-                    <div className="font-bold text-sm mb-1 text-text">{g.name}</div>
-                    <div className="text-text-muted text-xs line-clamp-2 mb-3 px-1">{g.description}</div>
+                    <div className="min-h-9 flex items-center justify-center mb-1">
+                      <span className="font-bold text-sm leading-tight text-text line-clamp-2">{g.name}</span>
+                    </div>
+                    <div className="text-text-muted text-xs leading-relaxed line-clamp-2 min-h-10 mb-3 px-1">{g.description}</div>
 
-                    <CardMeta gameId={g.id} size="lg" />
-
-                    {/* Solo + Friends buttons */}
-                    <div className="flex gap-2 mt-3 w-full">
+                    {/* Stars + buttons anchored to card bottom for row alignment */}
+                    <div className="mt-auto w-full">
+                      <CardMeta {...statsFor(g.id)} size="lg" />
+                      <div className="flex gap-2 mt-3 w-full">
                       <button
                         type="button"
                         onClick={() => navigateToGame(g.id)}
@@ -403,6 +417,7 @@ export function GameHub() {
                           <Users size={12} /> Friends
                         </button>
                       )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -430,7 +445,7 @@ export function GameHub() {
                   className={`bg-gradient-to-br ${th.from} border ${th.border} rounded-2xl p-5 cursor-pointer transition-all duration-200 active:scale-[0.98] ${th.glow}`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`w-14 h-14 rounded-2xl ${th.iconBg} border ${th.border} flex items-center justify-center text-3xl flex-shrink-0`}>
+                    <div className={`w-14 h-14 rounded-2xl ${th.iconBg} border ${th.border} flex items-center justify-center text-3xl flex-shrink-0 animate-[breathe-pulse_4s_ease-in-out_infinite]`}>
                       {g.emoji}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -442,10 +457,24 @@ export function GameHub() {
                           </span>
                         )}
                       </div>
-                      <p className="text-text-muted text-xs mb-2.5 leading-relaxed">{g.description}</p>
-                      {g.bestFor && g.bestFor.length > 0 && (
+                      <p className="text-text-muted text-xs mb-2 leading-relaxed">{g.description}</p>
+                      {BREATHE_PATTERNS[g.id] && (
+                        <div className="flex flex-wrap items-center gap-1 mb-2">
+                          {BREATHE_PATTERNS[g.id].map((step, i) => (
+                            <span key={i} className="flex items-center gap-1">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${th.border} ${th.accent} bg-white/5`}>
+                                {step}
+                              </span>
+                              {i < BREATHE_PATTERNS[g.id].length - 1 && (
+                                <span className="text-text-muted/60 text-[9px]">→</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {g.benefits && g.benefits.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                          {g.bestFor.slice(0, 3).map((item, i) => (
+                          {g.benefits.slice(0, 3).map((item, i) => (
                             <span key={i} className="text-[10px] bg-white/5 text-text-muted px-2 py-0.5 rounded-full border border-white/8">
                               {item}
                             </span>
@@ -455,7 +484,7 @@ export function GameHub() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
-                    <CardMeta gameId={g.id} size="sm" />
+                    <CardMeta {...statsFor(g.id)} size="sm" />
                     <button
                       onClick={e => { e.stopPropagation(); navigateToGame(g.id); }}
                       className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-white/8 ${th.accent} hover:bg-white/15 transition-colors active:scale-95 border ${th.border}`}
@@ -487,14 +516,50 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+const SLEEP_OPTIONS: (number | null)[] = [15, 30, 60, null];
+
 function NowPlayingBar({ audio }: { audio: ReturnType<typeof useAudioEngine> }) {
   const [elapsed, setElapsed] = useState(0);
+  const [sleepSetting, setSleepSetting] = useState<number | null>(null);
+  const [sleepLeft, setSleepLeft] = useState<number | null>(null);
+  const sleepDeadlineRef = useRef<number | null>(null);
+  const sleepTimeoutRef = useRef<number | undefined>(undefined);
+  const stopRef = useRef(audio.stop);
+  useEffect(() => { stopRef.current = audio.stop; }, [audio.stop]);
 
   useEffect(() => {
     setElapsed(0);
-    const interval = setInterval(() => setElapsed(prev => prev + 1), 1000);
+    const interval = setInterval(() => {
+      setElapsed(prev => prev + 1);
+      if (sleepDeadlineRef.current) {
+        setSleepLeft(Math.max(0, Math.ceil((sleepDeadlineRef.current - Date.now()) / 1000)));
+      }
+    }, 1000);
     return () => clearInterval(interval);
   }, [audio.currentTrack]);
+
+  useEffect(() => () => {
+    if (sleepTimeoutRef.current) clearTimeout(sleepTimeoutRef.current);
+  }, []);
+
+  const cycleSleep = () => {
+    const next = SLEEP_OPTIONS[(SLEEP_OPTIONS.indexOf(sleepSetting) + 1) % SLEEP_OPTIONS.length];
+    setSleepSetting(next);
+    if (sleepTimeoutRef.current) clearTimeout(sleepTimeoutRef.current);
+    if (next === null) {
+      sleepDeadlineRef.current = null;
+      setSleepLeft(null);
+    } else {
+      sleepDeadlineRef.current = Date.now() + next * 60000;
+      setSleepLeft(next * 60);
+      sleepTimeoutRef.current = window.setTimeout(() => {
+        stopRef.current();
+        sleepDeadlineRef.current = null;
+        setSleepSetting(null);
+        setSleepLeft(null);
+      }, next * 60000);
+    }
+  };
 
   const track = TRACKS.find(t => t.id === audio.currentTrack);
   const ts = TRACK_TYPE_STYLES[track?.type ?? 'focus'];
@@ -522,6 +587,33 @@ function NowPlayingBar({ audio }: { audio: ReturnType<typeof useAudioEngine> }) 
           className="flex items-center gap-1 bg-card border border-white/10 text-text-muted text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-card-hover hover:text-text transition-colors"
         >
           <Pause size={12} /> Stop
+        </button>
+      </div>
+      <div className="flex items-center gap-2.5 mt-2.5 pl-1">
+        {audio.volume === 0 ? (
+          <VolumeX size={14} className="text-text-muted flex-shrink-0" />
+        ) : (
+          <Volume2 size={14} className={`flex-shrink-0 ${ts.accent}`} />
+        )}
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={audio.volume}
+          onChange={e => audio.setVolume(Number(e.target.value))}
+          aria-label="Volume"
+          className="flex-1 h-1 accent-accent cursor-pointer"
+        />
+        <button
+          onClick={cycleSleep}
+          aria-label={sleepSetting ? `Sleep timer, ${sleepLeft !== null ? formatTime(sleepLeft) : `${sleepSetting} minutes`} remaining` : 'Set sleep timer'}
+          className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-colors flex-shrink-0 ${
+            sleepSetting ? `${ts.pill} ${ts.border}` : 'bg-card border-white/10 text-text-muted hover:text-text'
+          }`}
+        >
+          <Moon size={11} />
+          {sleepLeft !== null ? formatTime(sleepLeft) : 'Sleep'}
         </button>
       </div>
     </div>
@@ -591,9 +683,14 @@ function TracksPanel({ audio }: { audio: ReturnType<typeof useAudioEngine> }) {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ts.pill}`}>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${ts.pill}`}>
                       {TRACK_TYPE_LABELS[track.type]}
                     </span>
+                    {track.bpm && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-white/5 text-text-muted border border-white/8 flex-shrink-0">
+                        {track.bpm} BPM
+                      </span>
+                    )}
                     <span className="text-text-muted text-xs truncate">{track.description}</span>
                   </div>
                 </div>

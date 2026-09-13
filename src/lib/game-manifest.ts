@@ -162,6 +162,12 @@ reg('mistake-master', {
   category: 'flexibility', stages: 99,
 }, () => import('@/games/mistake-master'));
 
+reg('mole-mash', {
+  name: 'Mole Mash', emoji: '🔨',
+  description: 'Whack the moles before they hide — golden ones are worth triple!',
+  category: 'motor', stages: 99,
+}, () => import('@/games/mole-mash'));
+
 reg('number-ninja', {
   name: 'Number Ninja', emoji: '🔢',
   description: 'Memorize the numbers, then type them back!',
@@ -283,6 +289,12 @@ reg('ludo', {
   minPlayers: 2, maxPlayers: 4,
 }, () => import('@/games/ludo'));
 
+reg('minesweeper', {
+  name: 'Minesweeper', emoji: '💣',
+  description: 'Reveal every safe square without setting off a mine!',
+  category: 'board', stages: 99,
+}, () => import('@/games/minesweeper'));
+
 reg('scrabble', {
   name: 'Scrabble', emoji: '🔤',
   description: 'Build words on the board for maximum points!',
@@ -317,6 +329,12 @@ reg('uno', {
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
 }, () => import('@/games/uno'));
+
+reg('word-guess', {
+  name: 'Word Guess', emoji: '🟩',
+  description: 'Guess the 5-letter word — green is right, yellow is close!',
+  category: 'board', stages: 99,
+}, () => import('@/games/word-guess'));
 
 reg('wordsearch', {
   name: 'Word Search', emoji: '🔍',

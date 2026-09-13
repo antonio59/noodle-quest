@@ -23,10 +23,11 @@ const GAME_IDS = [
   'dual-n-back', 'echo-tap', 'emotion-volcano', 'empathy-engine', 'feelings-faces',
   'fill-blank', 'flag-match', 'flexibility-frames', 'focus-frenzy', 'go-no-go',
   'grounding', 'just-right', 'ludo', 'map-quiz', 'memory-match', 'mirror-match',
-  'mistake-master', 'number-ninja', 'patience-pop', 'pattern-painter', 'pixel-paint',
-  'quick-math', 'reverse-cat', 'routine-roadmap', 'score-four', 'scrabble',
-  'snakes-ladders', 'squish-lab', 'steady-hands', 'story-builder', 'stroop-challenge',
-  'sudoku', 'tic-tac-toe', 'triangle-breathing', 'uno', 'wordsearch',
+  'minesweeper', 'mistake-master', 'mole-mash', 'number-ninja', 'patience-pop',
+  'pattern-painter', 'pixel-paint', 'quick-math', 'reverse-cat', 'routine-roadmap',
+  'score-four', 'scrabble', 'snakes-ladders', 'squish-lab', 'steady-hands',
+  'story-builder', 'stroop-challenge', 'sudoku', 'tic-tac-toe', 'triangle-breathing',
+  'uno', 'word-guess', 'wordsearch',
 ];
 
 function makeProps(overrides: Partial<GameProps> = {}): GameProps {

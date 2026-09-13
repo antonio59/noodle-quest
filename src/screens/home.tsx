@@ -218,7 +218,7 @@ export function Home() {
                 <button
                   key={g.id}
                   onClick={() => navigate(`/play/${g.id}`, { state: { stage: 1 } })}
-                  className="bg-card hover:bg-card-hover rounded-2xl p-4 text-left transition-all active:scale-[0.97] border border-white/5 hover:border-white/10 group relative overflow-hidden"
+                  className="bg-card hover:bg-card-hover rounded-2xl p-4 text-left transition-all active:scale-[0.97] border border-white/5 hover:border-white/10 group relative overflow-hidden flex flex-col"
                 >
                   {/* New badge */}
                   {!hasPlayed && (
@@ -234,9 +234,9 @@ export function Home() {
                   )}
 
                   <div className="text-3xl mb-2.5">{g.emoji}</div>
-                  <div className="font-bold text-sm text-text mb-0.5 pr-10 leading-tight">{g.name}</div>
+                  <div className="font-bold text-sm text-text mb-0.5 pr-10 leading-tight min-h-9 line-clamp-2">{g.name}</div>
 
-                  <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center justify-between mt-auto pt-2">
                     <div className="flex gap-0.5">
                       {[1, 2, 3].map(i => (
                         <Star

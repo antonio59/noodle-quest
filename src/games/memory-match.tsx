@@ -207,8 +207,10 @@ function MemoryMatchGame({ stage, onScore, onProgress, onEnd }: GameProps) {
     }
   }, [phase, cards, flippedIndices, matched, moves, score, config, onScore, onProgress, finishGame]);
 
-  const cardSize = config.pairs >= 12 ? 52 : config.pairs >= 8 ? 60 : 70;
-  const fontSize = cardSize * 0.48;
+  // Fluid cells: columns share the available width so 5–6 col boards fit
+  // narrow phones; emoji scale with the viewport, capped for desktop.
+  const fontCap = config.pairs >= 12 ? 26 : config.pairs >= 8 ? 30 : 34;
+  const fontSize = `min(${fontCap}px, ${Math.round(52 / config.cols)}vw)`;
 
   return (
     <div className="h-full flex flex-col items-center p-3">
@@ -224,18 +226,19 @@ function MemoryMatchGame({ stage, onScore, onProgress, onEnd }: GameProps) {
       </div>
 
       <div
-        className={`grid gap-1.5 p-3 bg-card rounded-xl transition-all ${wrongFlash ? 'ring-2 ring-red-400/60' : ''}`}
-        style={{ gridTemplateColumns: `repeat(${config.cols}, 1fr)` }}
+        className={`grid gap-1.5 p-3 bg-card rounded-xl transition-all w-full ${wrongFlash ? 'ring-2 ring-red-400/60' : ''}`}
+        style={{
+          gridTemplateColumns: `repeat(${config.cols}, minmax(0, 1fr))`,
+          maxWidth: Math.min(config.cols * 64, 430),
+        }}
       >
         {cards.map((card, i) => (
           <button
             key={card.id}
             onPointerDown={() => flipCard(i)}
             disabled={card.matched || card.flipped}
-            className="rounded-xl flex items-center justify-center select-none transition-all duration-200 relative overflow-hidden"
+            className="rounded-xl flex items-center justify-center select-none transition-all duration-200 relative overflow-hidden w-full aspect-square"
             style={{
-              width: cardSize,
-              height: cardSize,
               fontSize,
               background: card.matched
                 ? `linear-gradient(135deg, #4ade80, #22c55e)`
@@ -252,7 +255,7 @@ function MemoryMatchGame({ stage, onScore, onProgress, onEnd }: GameProps) {
             }}
           >
             {card.flipped || card.matched ? card.emoji : (
-              <span style={{ fontSize: fontSize * 0.6, opacity: 0.5 }}>?</span>
+              <span style={{ fontSize: '0.6em', opacity: 0.5 }}>?</span>
             )}
           </button>
         ))}

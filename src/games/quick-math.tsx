@@ -66,7 +66,7 @@ function makeChoices(problem: Problem): number[] {
   return Array.from(choices).sort(() => Math.random() - 0.5);
 }
 
-export default function QuickMath({ stage, onScore, onProgress, onEnd }: GameProps) {
+export default function QuickMath({ stage, onScore, onProgress, onEnd, paused }: GameProps) {
   const config = useMemo(() => scaleFromLast(stage, CONFIG, {
     problems: 0.1, timeLimit: -0.1, maxNum: 0.1,
   }, {
@@ -91,12 +91,52 @@ export default function QuickMath({ stage, onScore, onProgress, onEnd }: GamePro
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scoreRef = useRef(0);
   const correctRef = useRef(0);
+  // Mirror of state the timer callbacks need after a pause/resume — the
+  // timeout closure is recreated on resume so it can't capture stale values.
+  const timeLeftRef = useRef(0);
+  const problemRef = useRef(problem);
+  const indexRef = useRef(index);
+  const countdownActiveRef = useRef(false);
+  const advancePendingRef = useRef(false);
+  const advanceRef = useRef<(nextIndex: number, newCorrect: number) => void>(() => {});
+  useEffect(() => { problemRef.current = problem; }, [problem]);
+  useEffect(() => { indexRef.current = index; }, [index]);
 
   const clearTimers = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (intervalRef.current) clearInterval(intervalRef.current);
     timerRef.current = null;
     intervalRef.current = null;
+    countdownActiveRef.current = false;
+    advancePendingRef.current = false;
+  }, []);
+
+  // (Re)starts the per-problem countdown for `ms` — used at problem start
+  // and when resuming from pause with time remaining.
+  const beginCountdown = useCallback((ms: number) => {
+    const startTime = Date.now();
+    countdownActiveRef.current = true;
+    timeLeftRef.current = ms;
+    setTimeLeft(ms);
+    intervalRef.current = setInterval(() => {
+      const remaining = Math.max(0, ms - (Date.now() - startTime));
+      timeLeftRef.current = remaining;
+      setTimeLeft(remaining);
+    }, 50);
+    timerRef.current = setTimeout(() => {
+      countdownActiveRef.current = false;
+      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+      const p = problemRef.current;
+      setAnswerState('timeout');
+      setStreak(0);
+      setFeedback(`⏰ ${p.a} ${p.op} ${p.b} = ${p.answer}`);
+      setFeedbackType('bad');
+      advancePendingRef.current = true;
+      timerRef.current = setTimeout(() => {
+        advancePendingRef.current = false;
+        advanceRef.current(indexRef.current + 1, correctRef.current);
+      }, 900);
+    }, ms);
   }, []);
 
   const advance = useCallback((nextIndex: number, newCorrect: number) => {
@@ -126,22 +166,30 @@ export default function QuickMath({ stage, onScore, onProgress, onEnd }: GamePro
     const ch = makeChoices(p);
     setProblem(p);
     setChoices(ch);
-    setTimeLeft(config.timeLimit);
+    beginCountdown(config.timeLimit);
+  }, [config.maxNum, config.useDivision, config.timeLimit, config.problems, clearTimers, beginCountdown, onProgress, onEnd]);
 
-    const startTime = Date.now();
-    intervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      setTimeLeft(Math.max(0, config.timeLimit - elapsed));
-    }, 50);
+  useEffect(() => { advanceRef.current = advance; }, [advance]);
 
-    timerRef.current = setTimeout(() => {
-      setAnswerState('timeout');
-      setStreak(0);
-      setFeedback(`⏰ ${p.a} ${p.op} ${p.b} = ${p.answer}`);
-      setFeedbackType('bad');
-      setTimeout(() => advance(nextIndex + 1, correctRef.current), 900);
-    }, config.timeLimit);
-  }, [config.maxNum, config.useDivision, config.timeLimit, config.problems, clearTimers, onProgress, onEnd]);
+  // Freeze the countdown while the page is hidden / pause overlay is up,
+  // and pick it back up where it left off on resume.
+  useEffect(() => {
+    if (paused) {
+      clearTimers();
+      return;
+    }
+    if (phase !== 'playing' || countdownActiveRef.current || advancePendingRef.current) return;
+    if (answerState === null) {
+      if (timeLeftRef.current > 0) beginCountdown(timeLeftRef.current);
+    } else {
+      // A post-answer advance was frozen by the pause — resume it.
+      advancePendingRef.current = true;
+      timerRef.current = setTimeout(() => {
+        advancePendingRef.current = false;
+        advanceRef.current(indexRef.current + 1, correctRef.current);
+      }, 400);
+    }
+  }, [paused, phase, answerState, clearTimers, beginCountdown]);
 
   const handleAnswer = useCallback((choice: number, idx: number) => {
     if (phase !== 'playing' || answerState !== null) return;
@@ -170,7 +218,11 @@ export default function QuickMath({ stage, onScore, onProgress, onEnd }: GamePro
     }
 
     const snap = correctRef.current;
-    setTimeout(() => advance(index + 1, snap), 800);
+    advancePendingRef.current = true;
+    timerRef.current = setTimeout(() => {
+      advancePendingRef.current = false;
+      advance(index + 1, snap);
+    }, 800);
   }, [phase, answerState, problem, streak, timeLeft, config.timeLimit, clearTimers, advance, index, onScore]);
 
   const startGame = useCallback(() => {
@@ -191,22 +243,8 @@ export default function QuickMath({ stage, onScore, onProgress, onEnd }: GamePro
     const ch = makeChoices(p);
     setProblem(p);
     setChoices(ch);
-    setTimeLeft(config.timeLimit);
-
-    const startTime = Date.now();
-    intervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      setTimeLeft(Math.max(0, config.timeLimit - elapsed));
-    }, 50);
-
-    timerRef.current = setTimeout(() => {
-      setAnswerState('timeout');
-      setStreak(0);
-      setFeedback(`⏰ Time's up!`);
-      setFeedbackType('bad');
-      setTimeout(() => advance(1, correctRef.current), 900);
-    }, config.timeLimit);
-  }, [config, advance]);
+    beginCountdown(config.timeLimit);
+  }, [config, beginCountdown]);
 
   useEffect(() => () => clearTimers(), [clearTimers]);
 
