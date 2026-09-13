@@ -14,7 +14,9 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "convex:dev": "npx convex dev",
-    "convex:deploy": "CONVEX_DEPLOYMENT=prod:incredible-lobster-12 npx convex deploy --yes"
+    "convex:deploy": "CONVEX_DEPLOYMENT=prod:incredible-lobster-12 npx convex deploy --yes",
+    "pages:dev": "npm run build && npx wrangler pages dev dist",
+    "pages:deploy": "npm run build && npx wrangler pages deploy dist"
   },
   "dependencies": {
     "@react-three/fiber": "^9.6.1",
