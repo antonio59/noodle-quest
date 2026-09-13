@@ -103,7 +103,6 @@ pnpm run dev
 | `WEBHOOK_SECRET` | Convex | Required for `/webhook/report` (fail-closed if unset) |
 | `LINEAR_API_KEY` | Convex | Creates Linear issues from error reports (optional) |
 | `LINEAR_WEBHOOK_SECRET` | Convex | Required for `/webhook/linear` (fail-closed if unset) |
-| `REPORT_EMAIL_SECRET` | Netlify | Required header for the optional email report function |
 
 ### Scripts
 

@@ -4,8 +4,7 @@
 # environment variables are still configured in the Pages dashboard:
 #   Build command:  npx convex deploy --cmd 'npm run build'
 #   Output dir:     dist
-#   Env vars:       VITE_CONVEX_URL, CONVEX_DEPLOY_KEY (build-time),
-#                   REPORT_EMAIL_SECRET, ADMIN_EMAIL, RESEND_API_KEY (Function secrets)
+#   Env vars:       NODE_VERSION=22, VITE_CONVEX_URL, CONVEX_DEPLOY_KEY (secret)
 name = "noodle-quest"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-05-01"
