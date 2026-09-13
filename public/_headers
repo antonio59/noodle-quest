@@ -1,4 +1,4 @@
-# Cloudflare Pages headers — mirrors the former netlify.toml [[headers]] block.
+# Cloudflare Pages headers — applied to every response.
 # https://developers.cloudflare.com/pages/configuration/headers/
 /*
   X-Frame-Options: DENY

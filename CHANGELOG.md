@@ -5,6 +5,39 @@ All notable changes to **Noodle Quest v2** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Three new games**: Word Guess (Wordle-style, en-GB word list),
+  Minesweeper (flag/dig toggle for touch, first tap always safe), and
+  Mole Mash (whack-a-mole with golden moles and bomb decoys)
+- **Tracks tab**: master volume slider (persisted), sleep timer
+  (15/30/60 min, auto-stops playback), BPM badges on lo-fi tracks
+- **Breathe tab**: breathing-pattern chips (e.g. In 4s · Hold 7s · Out
+  8s) on each card, pulsing icons, benefit labels
+
+### Changed
+- **Hosting moved from Netlify to Cloudflare Pages** — `public/_headers`
+  and `public/_redirects` replace `netlify.toml`; wrangler config added
+  for local preview and direct-upload deploys
+- Chat: new messages no longer yank the scroll position when reading
+  history — a "new messages" pill appears instead; same-author groups
+  split on >5-minute gaps; avatar anchors to the last bubble
+- Game cards: name/description areas reserve consistent height and the
+  stars/play row anchors to the bottom, so cards align across rows
+
+### Fixed
+- iOS Safari no longer auto-zooms the chat input (16px field)
+- Memory Match grid is fluid — no more overflow on narrow phones at
+  5–6 columns
+- Quick Math countdown freezes while the app is paused/backgrounded and
+  resumes with remaining time
+- Mark-as-read no longer writes localStorage on every render
+
+### Removed
+- The never-configured report-email function (always returned 503;
+  nothing called it — reports go through Convex)
+
 ## [1.1.0] - 2026-09-13
 
 ### Added

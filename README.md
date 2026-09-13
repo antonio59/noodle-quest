@@ -52,7 +52,7 @@ Lo-fi beats, focus pads, nature sounds, and meditation tones — all synthesized
 
 ### Issue Reporting & Admin
 
-- In-app "report a problem" and "request a game" flows (with optional email relay via a Netlify function and Linear issue creation via webhook)
+- In-app "report a problem" and "request a game" flows (with Linear issue creation via webhook)
 - Admin panel (secret-gated) for player management: PIN resets, account merges, activity overview
 
 ## Tech Stack
@@ -63,7 +63,7 @@ Lo-fi beats, focus pads, nature sounds, and meditation tones — all synthesized
 | Build | Vite 8 |
 | Styling | Tailwind CSS 4 |
 | Backend | Convex (real-time database, auth, functions) |
-| Deployment | Netlify (frontend + functions), Convex Cloud (backend) |
+| Deployment | Cloudflare Pages (frontend), Convex Cloud (backend) |
 | 3D | three.js + @react-three/fiber (lazy-loaded only for 3D games) |
 | Icons | Lucide React |
 | Audio | Web Audio API (programmatic synthesis) |
@@ -181,19 +181,24 @@ Playwright smoke tests cover the public surface (app shell, PWA plumbing, dictio
 
 ## Deployment
 
-Netlify builds deploy the Convex backend first, then the frontend, so the two stay in sync:
+Hosted on **Cloudflare Pages** (git-connected, auto-deploys `main`). The build
+deploys the Convex backend first, then the frontend, so the two stay in sync:
 
-```toml
-# netlify.toml
-command = "npx convex deploy --cmd 'npm run build'"
 ```
+Build command:  npx convex deploy --cmd 'npm run build'
+Output dir:     dist
+```
+
+SPA fallback and security headers live in `public/_redirects` and
+`public/_headers`. Pages build env vars: `NODE_VERSION=22`,
+`VITE_CONVEX_URL`, `CONVEX_DEPLOY_KEY` (secret).
 
 Manual deploys:
 
 ```bash
-pnpm run build
-pnpm exec netlify deploy --prod --dir=dist   # frontend
-pnpm run convex:deploy                        # backend only
+pnpm run pages:deploy   # build + wrangler pages deploy dist
+pnpm run convex:deploy  # backend only
+pnpm run pages:dev      # local preview via wrangler pages dev
 ```
 
 ## License

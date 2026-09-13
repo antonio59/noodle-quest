@@ -28,8 +28,8 @@ dist-ssr
 test-results
 playwright-report
 
-# Local Netlify folder
-.netlify
+# Local wrangler/Cloudflare state
+.wrangler
 .claude/worktrees/
 .gstack/
 

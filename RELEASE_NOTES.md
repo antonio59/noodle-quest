@@ -1,5 +1,37 @@
 # Release Notes — Noodle Quest
 
+## Next — Unreleased
+
+A mobile-polish pass: three new games, a chat that stops scrolling away from you, and breathing exercises that tell you the pattern before you start.
+
+### 🎮 Three new games
+
+- **Word Guess** — a Wordle-style daily-brain workout using the UK word list, with an on-screen keyboard
+- **Minesweeper** — the classic, rebuilt for thumbs: a Flag/Dig toggle means no fiddly long-presses, and your first tap is always safe
+- **Mole Mash** — whack-a-mole with golden bonus moles and stink-bomb decoys you should *not* hit
+
+### 💬 Chat that stays put
+
+Reading back through history while people keep chatting? The feed no longer rips you to the bottom — a "new messages" pill floats down instead, and you tap it when you're ready. Messages from the same person now split into separate bubbles after a 5-minute gap, and the chat box no longer triggers iOS's annoying auto-zoom.
+
+### 🧘 Breathe & Tracks upgrades
+
+- Every breathing card now shows its actual pattern (**In 4s · Hold 7s · Out 8s**) and what it's good for before you begin, with a gently pulsing icon
+- The music player gains a **volume slider** that remembers your setting and a **sleep timer** (15/30/60 minutes) that fades out on its own — plus BPM badges on lo-fi tracks
+
+### 📱 Better on phones
+
+- Game cards line up properly — stars and Play buttons sit level across every row
+- Memory Match no longer overflows small screens at higher stages
+- Quick Math's timer pauses when you switch apps instead of silently expiring
+
+### 🔐 Under the hood
+
+- Moved hosting to **Cloudflare Pages** — same URL, faster edge delivery
+- Removed a report-email endpoint that was never wired up
+
+---
+
 ## 1.1 — 13 September 2026
 
 This update makes online games trustworthy and more fun: the server now referees every online board game, Cube Twist becomes a real race, and there's a fresh new look.
