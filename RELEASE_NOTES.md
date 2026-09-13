@@ -1,6 +1,6 @@
 # Release Notes — Noodle Quest
 
-## Next — Unreleased
+## 1.2 — 13 September 2026
 
 A mobile-polish pass: three new games, a chat that stops scrolling away from you, and breathing exercises that tell you the pattern before you start.
 
