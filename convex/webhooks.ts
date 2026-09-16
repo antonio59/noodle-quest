@@ -1,11 +1,85 @@
 /// <reference types="node" />
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { httpAction, type ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { timingSafeEqual } from "./model/admin";
 
 const http = httpRouter();
+
+// Signup approval links from the owner notification email.
+// GET renders a confirm page — never acts — so email scanners that
+// prefetch links can't approve anyone. POST performs the decision.
+const approvePage = (body: string) => new Response(
+  `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Noodle Quest</title></head>
+   <body style="font-family:system-ui,sans-serif;background:#0c1916;color:#f3efe6;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
+   <div style="max-width:420px;text-align:center;padding:24px">${body}</div></body></html>`,
+  { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
+);
+
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+async function signupDecision(ctx: ActionCtx, token: string, decision: string) {
+  if (decision !== "approve" && decision !== "reject") {
+    return approvePage("<h1>🍜 Bad link</h1><p>This link is malformed.</p>");
+  }
+  const result = await ctx.runMutation(internal.signups.applySignupDecision, { token, decision });
+  if (!result.found) {
+    return approvePage("<h1>🍜 Link expired</h1><p>This approval link was already used or doesn't exist.</p>");
+  }
+  if (!result.changed) {
+    return approvePage(`<h1>🍜 Already handled</h1><p>${escapeHtml(result.name)}'s signup was already decided.</p>`);
+  }
+  const approved = decision === "approve";
+  return approvePage(
+    `<h1>🍜 ${approved ? "Approved!" : "Rejected"}</h1>
+     <p>${escapeHtml(result.name)} ${approved ? "can now log in and play." : "has been blocked."}</p>`,
+  );
+}
+
+http.route({
+  path: "/approve-signup",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token") ?? "";
+    const decision = url.searchParams.get("decision") ?? "";
+    const player = token
+      ? await ctx.runQuery(internal.signups.getByApprovalToken, { token })
+      : null;
+    if (!player) {
+      return approvePage("<h1>🍜 Link expired</h1><p>This approval link was already used or doesn't exist.</p>");
+    }
+    if (player.status !== "pending") {
+      return approvePage(`<h1>🍜 Already handled</h1><p>${escapeHtml(player.name)}'s signup was already decided.</p>`);
+    }
+    const action = decision === "reject" ? "Reject" : "Approve";
+    return approvePage(
+      `<div style="font-size:48px">${escapeHtml(player.avatar)}</div>
+       <h1>${action} ${escapeHtml(player.name)}?</h1>
+       <p style="color:#9bb5ab">Signed up ${new Date(player.createdAt).toLocaleString()}</p>
+       <form method="POST" action="/approve-signup">
+         <input type="hidden" name="token" value="${escapeHtml(token)}"/>
+         <input type="hidden" name="decision" value="${escapeHtml(decision)}"/>
+         <button type="submit" style="background:${decision === "reject" ? "#ef5b5b" : "#3ecf8e"};color:#06251a;font-weight:bold;padding:14px 32px;border:none;border-radius:12px;font-size:18px;cursor:pointer">
+           Yes, ${action.toLowerCase()} them
+         </button>
+       </form>
+       <p style="margin-top:16px"><a href="/approve-signup?token=${encodeURIComponent(token)}&decision=${decision === "reject" ? "approve" : "reject"}" style="color:#9bb5ab">Actually, ${decision === "reject" ? "approve" : "reject"} instead</a></p>`,
+    );
+  }),
+});
+
+http.route({
+  path: "/approve-signup",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const form = await request.formData();
+    const token = String(form.get("token") ?? "");
+    const decision = String(form.get("decision") ?? "");
+    return signupDecision(ctx, token, decision);
+  }),
+});
 
 // Webhook endpoint for receiving error reports from OpenClaw bot or other sources
 http.route({

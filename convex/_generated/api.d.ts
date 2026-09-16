@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as challenges from "../challenges.js";
+import type * as emails from "../emails.js";
 import type * as feed from "../feed.js";
 import type * as games from "../games.js";
 import type * as http from "../http.js";
@@ -20,6 +21,7 @@ import type * as model_gameRules from "../model/gameRules.js";
 import type * as model_validateMove from "../model/validateMove.js";
 import type * as multiplayer from "../multiplayer.js";
 import type * as reports from "../reports.js";
+import type * as signups from "../signups.js";
 import type * as webhooks from "../webhooks.js";
 
 import type {
@@ -31,6 +33,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   challenges: typeof challenges;
+  emails: typeof emails;
   feed: typeof feed;
   games: typeof games;
   http: typeof http;
@@ -41,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "model/validateMove": typeof model_validateMove;
   multiplayer: typeof multiplayer;
   reports: typeof reports;
+  signups: typeof signups;
   webhooks: typeof webhooks;
 }>;
 

@@ -4,7 +4,8 @@ import type { Player } from '@/types';
 interface AuthCtx {
   player: Player | null;
   login: (name: string, pin: string) => Promise<string | null>;
-  signup: (name: string, pin: string, avatar?: string) => Promise<string | null>;
+  /** Returns { pending: true } when the signup needs owner approval. */
+  signup: (name: string, pin: string, avatar?: string, inviteCode?: string) => Promise<{ error?: string; pending?: boolean }>;
   logout: () => void;
   updateAvatar: (emoji: string) => Promise<void>;
   updateName: (name: string) => Promise<string | null>;
@@ -70,13 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (name: string, pin: string, avatar?: string): Promise<string | null> => {
-    if (name.length < 2) return 'Name needs at least 2 characters!';
-    if (!/^\d{6}$/.test(pin)) return 'Passcode must be 6 digits';
+  const signup = async (name: string, pin: string, avatar?: string, inviteCode?: string): Promise<{ error?: string; pending?: boolean }> => {
+    if (name.length < 2) return { error: 'Name needs at least 2 characters!' };
+    if (!/^\d{6}$/.test(pin)) return { error: 'Passcode must be 6 digits' };
     try {
-      const data = await callConvex('mutation', 'auth:signUp', { name: name.trim(), pin, avatar });
-      if (data.status === 'error') return data.errorMessage;
-      if (data.value?.error) return data.value.error;
+      const data = await callConvex('mutation', 'auth:signUp', { name: name.trim(), pin, avatar, inviteCode });
+      if (data.status === 'error') return { error: data.errorMessage };
+      if (data.value?.error) return { error: data.value.error };
+      if (data.value?.pending) return { pending: true };
       const p: Player = {
         playerId: data.value.playerId,
         name: name.trim(),
@@ -86,9 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         theme: 'dark',
       };
       setPlayer(p);
-      return null;
+      return {};
     } catch {
-      return 'Connection error. Check your internet.';
+      return { error: 'Connection error. Check your internet.' };
     }
   };
 

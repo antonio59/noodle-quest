@@ -1,12 +1,7 @@
 // @vitest-environment edge-runtime
 import { describe, expect, test } from "vitest";
 import { api } from "../../convex/_generated/api";
-import { setup } from "./setup";
-
-async function signedUp(t: ReturnType<typeof setup>, name: string) {
-  const res = await t.mutation(api.auth.signUp, { name, pin: "123456" });
-  return { playerId: res.playerId!, sessionToken: res.sessionToken! };
-}
+import { setup, approvedPlayer as signedUp } from "./setup";
 
 describe("sendChallenge", () => {
   test("requires a valid session", async () => {

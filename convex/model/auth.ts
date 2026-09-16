@@ -82,7 +82,10 @@ export async function playerFromSession(
     .withIndex("by_token", q => q.eq("token", token))
     .unique();
   if (!session || session.expiresAt < Date.now()) return null;
-  return await ctx.db.get(session.playerId);
+  const player = await ctx.db.get(session.playerId);
+  // Pending/rejected accounts hold no access even if a session exists.
+  if (player && player.status && player.status !== "approved") return null;
+  return player;
 }
 
 export async function deleteSessionsForPlayer(ctx: MutationCtx, playerId: Id<"players">): Promise<void> {

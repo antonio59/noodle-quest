@@ -16,10 +16,21 @@ export default defineSchema({
     // Family prefs — optional so existing rows stay valid.
     kidMode: v.optional(v.boolean()),
     theme: v.optional(v.union(v.literal("dark"), v.literal("light"))),
+    // Signup gate. Missing = approved (grandfathered players). "pending"
+    // waits for admin approval; "rejected" is blocked and hidden.
+    status: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    )),
+    // Single-use capability token embedded in the admin approval email —
+    // lets the owner approve/reject from the link without logging in.
+    approvalToken: v.optional(v.string()),
     createdAt: v.number(),
     lastActive: v.number(),
   })
     .index("by_name", ["name"])
+    .index("by_approval", ["approvalToken"])
     .searchIndex("search_name", { searchField: "name" }),
 
   // Auth sessions. A token is issued on signup/login and must accompany

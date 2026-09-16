@@ -6,6 +6,7 @@ import {
   verifyPin,
   isValidPin,
   generateSalt,
+  generateToken,
   createSession,
   playerFromSession,
   deleteSessionsForPlayer,
@@ -13,6 +14,7 @@ import {
   LOCKOUT_MS,
 } from "./model/auth";
 import { assertAdminSecret } from "./model/admin";
+import { internal } from "./_generated/api";
 
 // Expanded avatar pool — must stay in sync with src/lib/avatars.ts
 const AVATARS = [
@@ -31,7 +33,14 @@ async function findPlayerByName(ctx: MutationCtx, name: string) {
 }
 
 export const signUp = mutation({
-  args: { name: v.string(), pin: v.string(), avatar: v.optional(v.string()) },
+  args: {
+    name: v.string(),
+    pin: v.string(),
+    avatar: v.optional(v.string()),
+    // Present when signing up through a game invite link — invited friends
+    // skip the approval queue.
+    inviteCode: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const name = args.name.trim();
     if (name.length < 2) return { error: "Name needs at least 2 characters!" };
@@ -41,12 +50,42 @@ export const signUp = mutation({
     const existing = await findPlayerByName(ctx, name);
     if (existing) return { error: "Name already taken!" };
 
+    // A live multiplayer invite auto-approves — someone already vouched.
+    let invited = false;
+    if (args.inviteCode) {
+      const invite = await ctx.db
+        .query("multiplayer_invites")
+        .withIndex("by_code", q => q.eq("inviteCode", args.inviteCode!))
+        .unique();
+      invited = !!invite && invite.status === "pending" && invite.expiresAt > Date.now();
+    }
+
     const avatar = args.avatar && AVATARS.includes(args.avatar)
       ? args.avatar
       : AVATARS[Math.floor(Math.random() * AVATARS.length)];
     const pinSalt = generateSalt();
     const pinHash = await hashPin(args.pin, pinSalt);
     const now = Date.now();
+
+    if (invited) {
+      const playerId = await ctx.db.insert("players", {
+        name,
+        pinHash,
+        pinSalt,
+        avatar,
+        kidMode: false,
+        theme: "dark",
+        status: "approved",
+        createdAt: now,
+        lastActive: now,
+      });
+      const sessionToken = await createSession(ctx, playerId);
+      return { playerId, avatar, sessionToken, kidMode: false, theme: "dark" as const };
+    }
+
+    // Uninvited signup — park it until the owner approves. No session is
+    // issued, so nothing in the app is reachable yet.
+    const approvalToken = generateToken();
     const playerId = await ctx.db.insert("players", {
       name,
       pinHash,
@@ -54,11 +93,18 @@ export const signUp = mutation({
       avatar,
       kidMode: false,
       theme: "dark",
+      status: "pending",
+      approvalToken,
       createdAt: now,
       lastActive: now,
     });
-    const sessionToken = await createSession(ctx, playerId);
-    return { playerId, avatar, sessionToken, kidMode: false, theme: "dark" as const };
+    // Fire-and-forget: email the owner an approve/reject link.
+    await ctx.scheduler.runAfter(0, internal.emails.sendSignupApproval, {
+      name,
+      avatar,
+      approvalToken,
+    });
+    return { pending: true as const, playerId };
   },
 });
 
@@ -67,6 +113,12 @@ export const logIn = mutation({
   handler: async (ctx, args) => {
     const player = await ctx.db.query("players").withIndex("by_name", q => q.eq("name", args.name.trim())).unique();
     if (!player) return { error: "No player found." };
+    if (player.status === "pending") {
+      return { error: "Almost there — the site owner still needs to approve your account." };
+    }
+    if (player.status === "rejected") {
+      return { error: "This account wasn't approved." };
+    }
 
     const now = Date.now();
     if (player.lockedUntil && player.lockedUntil > now) {
@@ -206,7 +258,10 @@ export const getAllPlayers = query({
   args: {},
   handler: async (ctx) => {
     const players = await ctx.db.query("players").collect();
-    return players.map(p => ({ id: p._id, name: p.name, avatar: p.avatar }));
+    // The picker is public — keep pending/rejected signups off it.
+    return players
+      .filter(p => p.status === undefined || p.status === "approved")
+      .map(p => ({ id: p._id, name: p.name, avatar: p.avatar }));
   },
 });
 
@@ -217,7 +272,34 @@ export const adminGetAllPlayers = query({
     const auth = await assertAdminSecret(ctx, args.adminSecret);
     if (auth.ok === false) return { error: auth.error };
     const players = await ctx.db.query("players").collect();
-    return { players: players.map(p => ({ id: p._id, name: p.name, avatar: p.avatar, createdAt: p.createdAt, lastActive: p.lastActive })) };
+    return { players: players.map(p => ({ id: p._id, name: p.name, avatar: p.avatar, status: p.status ?? "approved", createdAt: p.createdAt, lastActive: p.lastActive })) };
+  },
+});
+
+// Admin: approve a pending signup (also usable after an email link fails).
+export const adminApprovePlayer = mutation({
+  args: { playerId: v.id("players"), adminSecret: v.string() },
+  handler: async (ctx, args) => {
+    const auth = await assertAdminSecret(ctx, args.adminSecret);
+    if (auth.ok === false) return { error: auth.error };
+    const player = await ctx.db.get(args.playerId);
+    if (!player) return { error: "Player not found" };
+    await ctx.db.patch(args.playerId, { status: "approved", approvalToken: undefined });
+    return { success: true };
+  },
+});
+
+// Admin: reject a pending signup — blocks login and revokes any sessions.
+export const adminRejectPlayer = mutation({
+  args: { playerId: v.id("players"), adminSecret: v.string() },
+  handler: async (ctx, args) => {
+    const auth = await assertAdminSecret(ctx, args.adminSecret);
+    if (auth.ok === false) return { error: auth.error };
+    const player = await ctx.db.get(args.playerId);
+    if (!player) return { error: "Player not found" };
+    await ctx.db.patch(args.playerId, { status: "rejected", approvalToken: undefined });
+    await deleteSessionsForPlayer(ctx, args.playerId);
+    return { success: true };
   },
 });
 

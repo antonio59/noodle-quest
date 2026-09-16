@@ -1,13 +1,8 @@
 // @vitest-environment edge-runtime
 import { describe, expect, test } from "vitest";
 import { api } from "../../convex/_generated/api";
-import { setup } from "./setup";
+import { setup, approvedPlayer as signedUpPlayer } from "./setup";
 import { applyCubeMove, newCube, snlResolve } from "../../convex/model/gameRules";
-
-async function signedUpPlayer(t: ReturnType<typeof setup>, name: string) {
-  const res = await t.mutation(api.auth.signUp, { name, pin: "123456" });
-  return { playerId: res.playerId!, sessionToken: res.sessionToken! };
-}
 
 async function startGame(t: ReturnType<typeof setup>, gameId: string) {
   const host = await signedUpPlayer(t, "Host");

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Search, GitMerge, KeyRound, Users } from 'lucide-react';
+import { ArrowLeft, Search, GitMerge, KeyRound, Users, UserCheck, UserX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Player {
   id: string;
   name: string;
   avatar: string;
+  status?: 'pending' | 'approved' | 'rejected';
   createdAt: number;
   lastActive: number;
 }
@@ -151,6 +152,31 @@ export function Admin() {
     }
   };
 
+  const handleSignupDecision = async (playerId: string, path: 'adminApprovePlayer' | 'adminRejectPlayer') => {
+    setLoading(true);
+    setMessage('');
+    setError('');
+    try {
+      const res = await fetch(`${CONVEX_URL}/api/mutation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Convex-Client': 'npm-1.33.1' },
+        body: JSON.stringify({ path: `auth:${path}`, format: 'convex_encoded_json', args: [{ playerId, adminSecret: secret }] }),
+      });
+      const data = await res.json();
+      if (data.value?.error) {
+        setError(data.value.error);
+      } else if (data.value?.success) {
+        setMessage(path === 'adminApprovePlayer' ? 'Player approved ✓' : 'Player rejected');
+        await fetchPlayers();
+      }
+    } catch {
+      setError('Action failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pendingPlayers = players.filter(p => p.status === 'pending');
   const filtered = players.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
   if (!authenticated) {
@@ -203,6 +229,45 @@ export function Admin() {
         {(message || error) && (
           <div className={`rounded-xl p-4 text-center font-medium ${error ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'}`}>
             {error || message}
+          </div>
+        )}
+
+        {/* Pending signups — new accounts wait here for approval */}
+        {pendingPlayers.length > 0 && (
+          <div className="bg-card rounded-2xl p-6 shadow-lg ring-1 ring-warning/40">
+            <h2 className="text-lg font-bold text-text mb-1 flex items-center gap-2">
+              <UserCheck size={20} /> Pending signups
+            </h2>
+            <p className="text-text-muted text-sm mb-4">
+              These people signed up without an invite. Approve to let them in.
+            </p>
+            <div className="space-y-2">
+              {pendingPlayers.map(p => (
+                <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface">
+                  <span className="text-2xl">{p.avatar}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-text truncate">{p.name}</p>
+                    <p className="text-xs text-text-muted">
+                      Signed up {new Date(p.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleSignupDecision(p.id, 'adminApprovePlayer')}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 bg-success/15 text-success font-bold text-sm px-4 py-2 rounded-xl hover:bg-success/25 disabled:opacity-50 active:scale-95 transition"
+                  >
+                    <UserCheck size={15} /> Approve
+                  </button>
+                  <button
+                    onClick={() => handleSignupDecision(p.id, 'adminRejectPlayer')}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 bg-danger/15 text-danger font-bold text-sm px-4 py-2 rounded-xl hover:bg-danger/25 disabled:opacity-50 active:scale-95 transition"
+                  >
+                    <UserX size={15} /> Reject
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -312,6 +377,9 @@ export function Admin() {
                       <p className="text-xs text-text-muted">Tap to load details</p>
                     )}
                   </div>
+                  {p.status === 'rejected' && (
+                    <span className="text-danger font-bold text-xs uppercase tracking-wide">Rejected</span>
+                  )}
                   {isSelected && (
                     <span className="text-accent font-bold text-sm">
                       {selectedForMerge.indexOf(p.id) === 0 ? 'Source' : 'Target'}

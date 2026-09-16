@@ -39,6 +39,7 @@ export function Auth() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [signupName, setSignupName] = useState('');
   const [signupAvatar, setSignupAvatar] = useState('🦊');
   const [signupPin, setSignupPin] = useState('');
@@ -110,9 +111,10 @@ export function Auth() {
       const err = await login(selectedProfile.name, newPin);
       setLoading(false);
       if (err) {
-        setError('Incorrect passcode. Try again!');
+        // Server errors carry useful context (lockout, pending approval).
+        setError(err);
         setPin('');
-        setTimeout(() => setError(''), 2000);
+        setTimeout(() => setError(''), 4000);
       } else {
         navigate(returnTo);
       }
@@ -127,17 +129,45 @@ export function Auth() {
     setError('');
   };
 
+  // If we arrived via a game invite link, carry its code so the invitee
+  // is auto-approved instead of queued for the owner.
+  const inviteCode = returnTo.startsWith('/invite/')
+    ? returnTo.split('/')[3]
+    : undefined;
+
   const handleSignup = async () => {
     if (!signupName.trim()) { setError('Enter your name!'); return; }
     if (signupName.trim().length < 2) { setError('Name needs 2+ characters!'); return; }
     if (!/^\d{6}$/.test(signupPin)) { setError('Passcode must be 6 digits'); return; }
     if (signupPin !== signupPinConfirm) { setError('Passcodes don\'t match!'); return; }
     setLoading(true);
-    const err = await signup(signupName.trim(), signupPin, signupAvatar);
+    const res = await signup(signupName.trim(), signupPin, signupAvatar, inviteCode);
     setLoading(false);
-    if (err) setError(err);
+    if (res.error) setError(res.error);
+    else if (res.pending) setPendingApproval(true);
     else navigate(returnTo);
   };
+
+  if (pendingApproval) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-br from-bg via-surface to-bg">
+        <div className="bg-card rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center">
+          <div className="text-5xl mb-4" aria-hidden>⏳</div>
+          <h2 className="text-xl font-bold text-text mb-2">You're in the queue!</h2>
+          <p className="text-text-muted text-sm leading-relaxed mb-6">
+            {signupAvatar} <strong className="text-text">{signupName.trim()}</strong> is signed up — the site
+            owner just needs to tap <em>approve</em> first. Check back soon!
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full bg-accent text-bg font-bold py-3 rounded-xl hover:opacity-90 active:scale-95 transition"
+          >
+            Back home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (showSignup) {
     return (
