@@ -7,17 +7,38 @@ import { test, expect, type Page } from '@playwright/test';
 // It is opt-in because it needs a live deployment and creates real players:
 //
 //   VITE_CONVEX_URL=<dev deployment url> pnpm build
-//   NQ_E2E_LIVE=1 pnpm playwright test e2e/multiplayer.spec.ts
+//   NQ_E2E_LIVE=1 NQ_ADMIN_SECRET=<secret> NQ_CONVEX_URL=<dev url> \
+//     pnpm playwright test e2e/multiplayer.spec.ts
+//
+// Signup now requires owner approval, so NQ_ADMIN_SECRET approves the host
+// via the admin API — the guest instead signs up through the invite link,
+// which auto-approves (the real invitee flow).
 //
 // Point it at a throwaway dev deployment, never production.
 const LIVE = !!process.env.NQ_E2E_LIVE;
+const ADMIN_SECRET = process.env.NQ_ADMIN_SECRET ?? '';
+const CONVEX_URL = process.env.NQ_CONVEX_URL ?? process.env.VITE_CONVEX_URL ?? '';
 test.skip(!LIVE, 'set NQ_E2E_LIVE=1 and build against a dev Convex deployment');
+test.skip(!ADMIN_SECRET || !CONVEX_URL, 'set NQ_ADMIN_SECRET and NQ_CONVEX_URL');
 test.skip(({ isMobile }) => !!isMobile, 'desktop project only — the flow is device-agnostic');
 
 const RUN = Date.now().toString(36);
 const PIN = '246810';
 
-async function signUp(page: Page, name: string) {
+async function convexCall(fn: 'query' | 'mutation', path: string, args: object) {
+  const res = await fetch(`${CONVEX_URL}/api/${fn}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, args, format: 'json' }),
+  });
+  const data = await res.json();
+  if (data.status !== 'success') throw new Error(`${path} failed: ${data.errorMessage}`);
+  return data.value;
+}
+
+// Direct signup lands on the pending-approval screen; the owner approves
+// via the admin API, then the player logs in normally.
+async function signUpAndApprove(page: Page, name: string) {
   await page.goto('/auth');
   const newPlayer = page.getByRole('button', { name: /new player/i });
   if (await newPlayer.isVisible({ timeout: 15_000 }).catch(() => false)) {
@@ -27,6 +48,17 @@ async function signUp(page: Page, name: string) {
   await page.getByPlaceholder('6-digit passcode').fill(PIN);
   await page.getByPlaceholder('Confirm passcode').fill(PIN);
   await page.getByRole('button', { name: /sign up/i }).click();
+  await expect(page.getByText(/in the queue/i)).toBeVisible({ timeout: 15_000 });
+
+  const { players } = await convexCall('query', 'auth:adminGetAllPlayers', { adminSecret: ADMIN_SECRET });
+  const me = players.find((p: { name: string }) => p.name === name);
+  expect(me, `pending player ${name} visible to admin`).toBeTruthy();
+  await convexCall('mutation', 'auth:adminApprovePlayer', { playerId: me.id, adminSecret: ADMIN_SECRET });
+
+  // Now log in as the approved player.
+  await page.goto('/auth');
+  await page.getByRole('button', { name }).click();
+  for (const d of PIN) await page.getByRole('button', { name: d, exact: true }).click();
   await page.waitForURL('/', { timeout: 15_000 });
 }
 
@@ -44,8 +76,7 @@ test('invite flow: two players join and exchange tic-tac-toe moves', async ({ br
   const nameB = `e2e-${RUN}-b`;
 
   try {
-    await signUp(pageA, nameA);
-    await signUp(pageB, nameB);
+    await signUpAndApprove(pageA, nameA);
 
     // Host opens tic-tac-toe in multiplayer mode from the board-games tab.
     await pageA.goto('/games?tab=board');
@@ -58,8 +89,20 @@ test('invite flow: two players join and exchange tic-tac-toe moves', async ({ br
     const code = (await codeEl.textContent())?.trim();
     expect(code).toBeTruthy();
 
-    // Guest accepts the invite — 2-player games auto-start on join.
+    // Guest follows the invite link logged-out → redirected to signup →
+    // the invite code auto-approves them (no owner approval needed) →
+    // lands back on the invite page and accepts.
     await pageB.goto(`/invite/tic-tac-toe/${code}`);
+    await pageB.waitForURL(/\/auth/, { timeout: 15_000 });
+    const newPlayer = pageB.getByRole('button', { name: /new player/i });
+    if (await newPlayer.isVisible({ timeout: 15_000 }).catch(() => false)) {
+      await newPlayer.click();
+    }
+    await pageB.getByPlaceholder('Your name').fill(nameB);
+    await pageB.getByPlaceholder('6-digit passcode').fill(PIN);
+    await pageB.getByPlaceholder('Confirm passcode').fill(PIN);
+    await pageB.getByRole('button', { name: /sign up/i }).click();
+    await pageB.waitForURL(/\/invite\//, { timeout: 15_000 });
     await expect(pageB.getByText(nameA)).toBeVisible({ timeout: 15_000 });
     await pageB.getByRole('button', { name: /accept & play/i }).click();
 
