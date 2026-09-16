@@ -17,7 +17,7 @@ import { getGameComponent, getGameMeta } from '@/lib/game-registry';
 import type { GameProps } from '@/types';
 
 const GAME_IDS = [
-  'anagram', 'attention-archery', 'bingo', 'bookworm', 'box-breathing', 'breath-bubbles',
+  '2048', 'anagram', 'attention-archery', 'bingo', 'bookworm', 'box-breathing', 'breath-bubbles',
   'calm-breathing', 'checkers', 'chess', 'coherent-breathing', 'color-rush',
   'connect-four', 'connect-lines', 'copy-cat', 'crossword', 'cube-twist',
   'dual-n-back', 'echo-tap', 'emotion-volcano', 'empathy-engine', 'feelings-faces',
@@ -26,7 +26,7 @@ const GAME_IDS = [
   'minesweeper', 'mistake-master', 'mole-mash', 'number-ninja', 'patience-pop',
   'pattern-painter', 'pixel-paint', 'quick-math', 'reverse-cat', 'routine-roadmap',
   'score-four', 'scrabble', 'snakes-ladders', 'squish-lab', 'steady-hands',
-  'story-builder', 'stroop-challenge', 'sudoku', 'tic-tac-toe', 'triangle-breathing',
+  'story-builder', 'stroop-challenge', 'sudoku', 'tetris', 'tic-tac-toe', 'triangle-breathing',
   'uno', 'word-guess', 'wordsearch',
 ];
 

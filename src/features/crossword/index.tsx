@@ -206,20 +206,23 @@ export default function CrosswordGame({ stage = 1, onScore, onProgress, onEnd }:
               </h3>
               <ul className="space-y-1">
                 {across.map(w => (
-                  <li
-                    key={w.id}
-                    className={`text-xs cursor-pointer rounded-lg px-2 py-1.5 transition ${
-                      activeWordId === w.id
-                        ? 'bg-accent/15 text-accent ring-1 ring-accent/30'
-                        : 'hover:bg-card-hover text-text'
-                    }`}
-                    onClick={() => {
-                      setActiveWordId(w.id);
-                      focusCell(w.row, w.col);
-                    }}
-                  >
-                    <span className="font-bold mr-1.5 text-accent/80">{w.number}.</span>
-                    {w.clue}
+                  <li key={w.id}>
+                    <button
+                      type="button"
+                      aria-current={activeWordId === w.id}
+                      className={`w-full text-left text-xs cursor-pointer rounded-lg px-2 py-1.5 transition ${
+                        activeWordId === w.id
+                          ? 'bg-accent/15 text-accent ring-1 ring-accent/30'
+                          : 'hover:bg-card-hover text-text'
+                      }`}
+                      onClick={() => {
+                        setActiveWordId(w.id);
+                        focusCell(w.row, w.col);
+                      }}
+                    >
+                      <span className="font-bold mr-1.5 text-accent/80">{w.number}.</span>
+                      {w.clue}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -231,20 +234,23 @@ export default function CrosswordGame({ stage = 1, onScore, onProgress, onEnd }:
               </h3>
               <ul className="space-y-1">
                 {down.map(w => (
-                  <li
-                    key={w.id}
-                    className={`text-xs cursor-pointer rounded-lg px-2 py-1.5 transition ${
-                      activeWordId === w.id
-                        ? 'bg-accent/15 text-accent ring-1 ring-accent/30'
-                        : 'hover:bg-card-hover text-text'
-                    }`}
-                    onClick={() => {
-                      setActiveWordId(w.id);
-                      focusCell(w.row, w.col);
-                    }}
-                  >
-                    <span className="font-bold mr-1.5 text-accent/80">{w.number}.</span>
-                    {w.clue}
+                  <li key={w.id}>
+                    <button
+                      type="button"
+                      aria-current={activeWordId === w.id}
+                      className={`w-full text-left text-xs cursor-pointer rounded-lg px-2 py-1.5 transition ${
+                        activeWordId === w.id
+                          ? 'bg-accent/15 text-accent ring-1 ring-accent/30'
+                          : 'hover:bg-card-hover text-text'
+                      }`}
+                      onClick={() => {
+                        setActiveWordId(w.id);
+                        focusCell(w.row, w.col);
+                      }}
+                    >
+                      <span className="font-bold mr-1.5 text-accent/80">{w.number}.</span>
+                      {w.clue}
+                    </button>
                   </li>
                 ))}
               </ul>

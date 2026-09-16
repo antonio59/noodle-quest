@@ -117,10 +117,10 @@ describe("getLeaderboard time windows", () => {
     });
     await t.mutation(api.games.saveScore, { sessionToken: bob.sessionToken, gameId: "chess", stage: 1, score: 50, stars: 1 });
 
-    const allTime = await t.query(api.games.getLeaderboard, {});
+    const allTime = await t.query(api.games.getLeaderboard, { sessionToken: bob.sessionToken });
     expect(allTime.map(e => e.playerName)).toEqual(["Alice", "Bob"]);
 
-    const week = await t.query(api.games.getLeaderboard, { since: Date.now() - 7 * 24 * 3600_000 });
+    const week = await t.query(api.games.getLeaderboard, { sessionToken: bob.sessionToken, since: Date.now() - 7 * 24 * 3600_000 });
     expect(week.map(e => e.playerName)).toEqual(["Bob"]);
   });
 });

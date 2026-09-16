@@ -80,9 +80,11 @@ export const createPost = mutation({
 });
 
 export const getFeed = query({
-  args: { limit: v.optional(v.number()) },
+  args: { limit: v.optional(v.number()), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
+    const viewer = await playerFromSession(ctx, args.sessionToken);
+    if (!viewer) return [];
+    const limit = Math.min(args.limit ?? 50, 100);
     const posts = await ctx.db.query("feed").withIndex("by_time").order("desc").take(limit);
     return posts.map(p => ({ id: p._id, authorName: p.authorName, authorAvatar: p.authorAvatar, type: p.type, content: p.content, gameId: p.gameId, gameName: p.gameName, gameEmoji: p.gameEmoji, stage: p.stage, stars: p.stars, createdAt: p.createdAt }));
   },
@@ -161,9 +163,11 @@ export const getLatestChatTime = query({
 });
 
 export const getActivity = query({
-  args: { limit: v.optional(v.number()) },
+  args: { limit: v.optional(v.number()), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
+    const viewer = await playerFromSession(ctx, args.sessionToken);
+    if (!viewer) return [];
+    const limit = Math.min(args.limit ?? 50, 100);
     const posts = await ctx.db.query("feed").withIndex("by_type_time", q => q.eq("type", "score")).order("desc").take(limit);
     return posts.map(mapPost);
   },

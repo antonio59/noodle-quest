@@ -49,8 +49,14 @@ export function Leaderboard() {
   const listRef = useRef<HTMLDivElement>(null);
   const [showSticky, setShowSticky] = useState(false);
 
-  const overallData = useQuery(api.games.getLeaderboard, { since });
-  const gameData = useQuery(api.games.getLeaderboard, selectedGame ? { gameId: selectedGame, since } : 'skip' as any);
+  const overallData = useQuery(
+    api.games.getLeaderboard,
+    player?.sessionToken ? { since, sessionToken: player.sessionToken } : 'skip' as any,
+  );
+  const gameData = useQuery(
+    api.games.getLeaderboard,
+    selectedGame && player?.sessionToken ? { gameId: selectedGame, since, sessionToken: player.sessionToken } : 'skip' as any,
+  );
 
   const isLoading = selectedGame ? gameData === undefined : overallData === undefined;
   const rawEntries: LeaderboardEntry[] = (selectedGame ? gameData : overallData) ?? [];

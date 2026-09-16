@@ -228,6 +228,12 @@ reg('stroop-challenge', {
   category: 'flexibility', stages: 99,
 }, () => import('@/games/stroop-challenge'));
 
+reg('tetris', {
+  name: 'Tetris', emoji: '🧱',
+  description: 'Stack falling blocks and clear rows — the classic spatial reasoning workout!',
+  category: 'flexibility', stages: 99,
+}, () => import('@/games/tetris/index'));
+
 reg('sudoku', {
   name: 'Sudoku', emoji: '🔢',
   description: 'Fill the 9×9 grid so every row, column and box contains 1–9.',
@@ -281,6 +287,12 @@ reg('crossword', {
   description: 'Solve crossword puzzles — tap to enter letters!',
   category: 'board', stages: 99,
 }, () => import('@/features/crossword/index'));
+
+reg('2048', {
+  name: '2048', emoji: '🔢',
+  description: 'Slide tiles and merge matching numbers — build the biggest tile!',
+  category: 'board', stages: 99,
+}, () => import('@/games/game-2048/index'));
 
 reg('ludo', {
   name: 'Ludo', emoji: '🎲',

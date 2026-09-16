@@ -111,6 +111,25 @@ export function Landing() {
         </div>
       </section>
 
+      {/* Why play — the pitch to grown-ups */}
+      <section className="px-5 pb-14 max-w-2xl mx-auto">
+        <button
+          onClick={() => navigate('/why-play')}
+          className="w-full text-left rounded-2xl bg-card/70 border border-white/5 hover:border-accent/30 p-6 transition group"
+        >
+          <p className="text-[11px] font-bold text-accent uppercase tracking-widest mb-2">For the grown-ups</p>
+          <p className="font-display text-xl font-bold text-text leading-snug mb-2">
+            Games are the active kind of screen time.
+          </p>
+          <p className="text-text-muted text-sm leading-relaxed mb-3">
+            What research says about play vs. the endless scroll — working memory, planning, calm, and why the dose matters. Sources named, claims honest.
+          </p>
+          <span className="inline-flex items-center gap-1 text-sm font-bold text-accent">
+            Read why it works <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" aria-hidden />
+          </span>
+        </button>
+      </section>
+
       {/* How it works */}
       <section className="px-5 pb-14 max-w-md mx-auto">
         <h2 className="font-display text-2xl font-bold text-text text-center mb-8">Three steps</h2>

@@ -231,8 +231,10 @@ export default function SudokuGame({ stage, onScore, onProgress, onEnd, onMessag
             const borderB = (r + 1) % 3 === 0 && r < 8 ? '2px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.06)';
 
             return (
-              <div key={`${r}-${c}`} onClick={() => handleCellClick(r, c)}
-                className="flex items-center justify-center cursor-pointer transition-all duration-75"
+              <button key={`${r}-${c}`} type="button" onClick={() => handleCellClick(r, c)}
+                aria-label={`Row ${r + 1}, column ${c + 1}${fixed ? `, given ${val}` : val ? `, ${val}` : ', empty'}`}
+                aria-pressed={isSelected}
+                className="game-cell flex items-center justify-center cursor-pointer transition-all duration-75"
                 style={{
                   width: cellSize, height: cellSize,
                   fontSize: `${Math.max(0.6, cellSize / 36)}rem`,
@@ -243,7 +245,7 @@ export default function SudokuGame({ stage, onScore, onProgress, onEnd, onMessag
                   color: isErr ? '#ef4444' : fixed ? 'white' : val !== 0 ? '#f0a83a' : 'transparent',
                 }}>
                 {val || ''}
-              </div>
+              </button>
             );
           })
         )}

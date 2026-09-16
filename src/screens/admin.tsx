@@ -292,10 +292,12 @@ export function Admin() {
               const isSelected = selectedForMerge.includes(p.id);
               const detail = details[p.id];
               return (
-                <div
+                <button
                   key={p.id}
+                  type="button"
                   onClick={() => toggleMergeSelection(p.id)}
-                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                  aria-pressed={isSelected}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors text-left ${
                     isSelected ? 'bg-accent/20 ring-1 ring-accent' : 'bg-surface hover:bg-card-hover'
                   }`}
                 >
@@ -315,7 +317,7 @@ export function Admin() {
                       {selectedForMerge.indexOf(p.id) === 0 ? 'Source' : 'Target'}
                     </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>

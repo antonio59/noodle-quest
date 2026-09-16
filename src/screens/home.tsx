@@ -301,6 +301,19 @@ export function Home() {
           </div>
         )}
 
+        {/* ── Brain food — why games beat the scroll ───────── */}
+        <button
+          onClick={() => navigate('/why-play')}
+          className="w-full flex items-center gap-3 bg-card hover:bg-card-hover border border-white/5 hover:border-accent/30 rounded-2xl px-4 py-3.5 text-left transition active:scale-[0.99] group"
+        >
+          <span className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center text-xl flex-shrink-0" aria-hidden>🧠</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-text">Why play beats scrolling</p>
+            <p className="text-xs text-text-muted mt-0.5">What the science says about games and your brain</p>
+          </div>
+          <ChevronRight size={16} className="text-text-muted group-hover:text-accent group-hover:translate-x-0.5 transition flex-shrink-0" aria-hidden />
+        </button>
+
         {/* ── Browse CTA ──────────────────────────────────── */}
         <button
           onClick={() => navigate('/games')}

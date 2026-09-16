@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { timingSafeEqual } from "./model/admin";
 
@@ -30,25 +31,33 @@ http.route({
 
       const body = await request.json() as Record<string, any>;
 
-      // Validate required fields
-      if (!body.errorId || !body.message) {
+      // Validate required fields — must be non-empty strings, not just truthy.
+      if (typeof body.errorId !== "string" || !body.errorId ||
+          typeof body.message !== "string" || !body.message) {
         return new Response(
           JSON.stringify({ error: "Missing required fields: errorId, message" }),
           { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
 
-      // Create the report (internal mutation — the webhook secret was verified above)
+      // Create the report (internal mutation — the webhook secret was verified above).
+      // Every field is capped so a malformed/huge payload can't bloat the table.
+      const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
+      const contextJson = body.context === undefined ? undefined : JSON.stringify(body.context);
       const { id: reportId, isNew } = await ctx.runMutation(internal.reports.createReportFromWebhook, {
-        errorId: body.errorId,
-        gameId: body.gameId,
-        playerId: body.playerId,
-        playerName: body.playerName,
-        errorType: body.errorType || "runtime",
-        severity: body.severity || "medium",
-        message: body.message,
-        stackTrace: body.stackTrace,
-        context: body.context,
+        errorId: str(body.errorId, 120)!,
+        gameId: str(body.gameId, 60),
+        playerId: typeof body.playerId === "string" && /^j[a-z0-9]{8,40}$/i.test(body.playerId)
+          ? body.playerId as Id<"players">
+          : undefined,
+        playerName: str(body.playerName, 60),
+        errorType: str(body.errorType, 40) || "runtime",
+        severity: str(body.severity, 20) || "medium",
+        message: str(body.message, 2000)!,
+        stackTrace: str(body.stackTrace, 8000),
+        context: contextJson === undefined ? undefined
+          : contextJson.length <= 4000 ? body.context
+          : contextJson.slice(0, 4000),
       });
 
       // Create Linear issue only for newly created reports (avoid duplicates)

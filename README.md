@@ -4,17 +4,17 @@ Brain games and board games for the whole family. Train your focus, memory, and 
 
 ## Features
 
-### 51 Games (8 categories)
+### 53 Games (8 categories)
 
 | Category | Games |
 |----------|-------|
 | Memory (9) | Anagram Blast, Copy Cat, Dual N-Back, Fill in the Blank, Flag Match, Map Quiz, Memory Match, Number Ninja, Sudoku |
 | Focus (10) | Attention Archery, Breath Bubbles, Color Rush, Echo Tap, Focus Frenzy, Go / No-Go, Grounding Garden, Mirror Match, Patience Pop, Quick Math |
-| Flexibility (6) | Cube Twist (3D), Flexibility Frames, Just Right, Mistake Master, Squish Lab, Stroop Challenge |
+| Flexibility (7) | Cube Twist (3D), Flexibility Frames, Just Right, Mistake Master, Squish Lab, Stroop Challenge, Tetris |
 | Motor (3) | Pattern Painter, Pixel Paint, Steady Hands |
 | Social (3) | Emotion Volcano, Empathy Engine, Feelings Faces |
 | Sequence (2) | Routine Roadmap, Story Builder |
-| Board (14) | Bingo, Bookworm, Checkers, Chess, Connect Four, Connect Lines, Crossword, Ludo, Scrabble, Score Four (3D), Snakes & Ladders, Tic-Tac-Toe, UNO, Word Search |
+| Board (15) | 2048, Bingo, Bookworm, Checkers, Chess, Connect Four, Connect Lines, Crossword, Ludo, Scrabble, Score Four (3D), Snakes & Ladders, Tic-Tac-Toe, UNO, Word Search |
 | Breathe (4) | 4-7-8 Calm, Box Breathing, Coherent Breathing, Triangle Breathing |
 
 Board games play against an AI with real search (minimax + alpha-beta) and stage-based difficulty — replaying an early stage is always a gentle match. Two games are fully 3D (three.js): **Cube Twist**, a twisty cube with swipe-to-turn, and **Score Four**, Connect Four in 3D with 76 winning lines. Scrabble validates against your choice of two real lexica — UK & International (SOWPODS) or US & Canada (TWL) — downloaded at runtime; online games use the host's choice so everyone plays by the same words.
@@ -49,6 +49,10 @@ Lo-fi beats, focus pads, nature sounds, and meditation tones — all synthesized
 - 6-digit PIN per player, stored hashed (never in plaintext)
 - Server-issued session tokens authenticate every write
 - Login lockout after repeated failed attempts
+
+### Why Play? (Gaming & the Brain)
+
+A curated, static reading page at `/why-play` covering what research says about games vs. doom-scrolling — working memory, planning, calm, and social play. Deliberately static (no third-party feed): sources are named, claims are hedged, and nothing external loads on a kids' site.
 
 ### Issue Reporting & Admin
 
@@ -140,8 +144,8 @@ pnpm run convex:deploy   # Deploy Convex functions to production
 
 ```
 src/
-  screens/       # Main views (home, game-hub, play, feed, leaderboard, profile, auth, admin, invite)
-  games/         # 51 game components; board/word games split into tested logic + UI
+  screens/       # Main views (home, game-hub, play, feed, leaderboard, profile, auth, admin, invite, why-play)
+  games/         # 53 game components; board/word games split into tested logic + UI
   components/    # Shared UI (NavBar, error boundary, report/request modals)
   hooks/         # useAudioEngine (Web Audio API), usePageVisibility
   contexts/      # AuthContext (login/signup/session token)

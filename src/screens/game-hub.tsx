@@ -439,10 +439,11 @@ export function GameHub() {
             {allGames.filter(g => g.category === 'breathe').map(g => {
               const th = BREATHE_THEMES[g.id] ?? BREATHE_THEMES['box-breathing'];
               return (
-                <div
+                <button
                   key={g.id}
+                  type="button"
                   onClick={() => navigateToGame(g.id)}
-                  className={`bg-gradient-to-br ${th.from} border ${th.border} rounded-2xl p-5 cursor-pointer transition-all duration-200 active:scale-[0.98] ${th.glow}`}
+                  className={`w-full text-left bg-gradient-to-br ${th.from} border ${th.border} rounded-2xl p-5 cursor-pointer transition-all duration-200 active:scale-[0.98] ${th.glow}`}
                 >
                   <div className="flex items-start gap-4">
                     <div className={`w-14 h-14 rounded-2xl ${th.iconBg} border ${th.border} flex items-center justify-center text-3xl flex-shrink-0 animate-[breathe-pulse_4s_ease-in-out_infinite]`}>
@@ -485,14 +486,13 @@ export function GameHub() {
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
                     <CardMeta {...statsFor(g.id)} size="sm" />
-                    <button
-                      onClick={e => { e.stopPropagation(); navigateToGame(g.id); }}
-                      className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-white/8 ${th.accent} hover:bg-white/15 transition-colors active:scale-95 border ${th.border}`}
+                    <span
+                      className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-white/8 ${th.accent} border ${th.border}`}
                     >
                       <Wind size={13} /> Begin
-                    </button>
+                    </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

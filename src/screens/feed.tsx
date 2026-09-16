@@ -195,7 +195,10 @@ export function Feed() {
     api.feed.getChatMessages,
     player?.sessionToken ? { limit: 100, sessionToken: player.sessionToken } : 'skip',
   );
-  const activityData = useQuery(api.feed.getActivity, { limit: 50 });
+  const activityData = useQuery(
+    api.feed.getActivity,
+    player?.sessionToken ? { limit: 50, sessionToken: player.sessionToken } : 'skip' as any,
+  );
   const searchResults = useQuery(
     api.auth.searchPlayers as any,
     mentionQuery.length >= 2 && player ? { query: mentionQuery, sessionToken: player.sessionToken } : 'skip' as any

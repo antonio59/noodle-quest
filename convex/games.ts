@@ -109,8 +109,10 @@ export const getMonthlyPlayCounts = query({
 });
 
 export const getLeaderboard = query({
-  args: { gameId: v.optional(v.string()), since: v.optional(v.number()) },
+  args: { gameId: v.optional(v.string()), since: v.optional(v.number()), sessionToken: v.string() },
   handler: async (ctx, args) => {
+    const viewer = await playerFromSession(ctx, args.sessionToken);
+    if (!viewer) return [];
     let scores: Doc<"scores">[];
     if (args.since !== undefined) {
       // Windowed boards (this week/month) walk the playedAt index; the
