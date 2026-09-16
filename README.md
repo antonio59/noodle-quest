@@ -85,8 +85,8 @@ A curated, static reading page at `/why-play` covering what research says about 
 
 ```bash
 # Clone
-git clone https://github.com/antonio59/noodle-quest-v2
-cd noodle-quest-v2
+git clone https://github.com/antonio59/noodle-quest
+cd noodle-quest
 
 # Install
 pnpm install
