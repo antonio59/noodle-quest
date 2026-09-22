@@ -164,14 +164,44 @@ describe("server deal", () => {
 
   test("uno: playing a card from hand rotates the turn per card rules", async () => {
     const t = setup();
-    const { host, sessionId } = await startGame(t, "uno");
+    const { host, guest, sessionId } = await startGame(t, "uno");
     await t.mutation(api.multiplayer.makeMove, {
       sessionId, sessionToken: host.sessionToken, move: { action: "deal" },
     });
-    const bs = ((await rawSession(t, sessionId))!.boardState) as any;
-    const hand = bs.hands["1"] as UnoCard[];
-    const top = bs.discard[bs.discard.length - 1] as UnoCard;
-    const playable = hand.find(c => canPlay(c, top, bs.color));
+
+    const state = async () =>
+      (((await rawSession(t, sessionId))!.boardState) as any);
+    const findPlayable = (bs: any) => {
+      const hand = bs.hands["1"] as UnoCard[];
+      const top = bs.discard[bs.discard.length - 1] as UnoCard;
+      return { hand, top, playable: hand.find(c => canPlay(c, top, bs.color)) };
+    };
+
+    // The deck is crypto-shuffled, so the dealt hand occasionally has zero
+    // playable cards (~5% of deals). Play the real flow — draw, pass if
+    // still stuck — until the host holds a playable card.
+    let bs = await state();
+    let { hand, top, playable } = findPlayable(bs);
+    for (let i = 0; i < 20 && !playable; i++) {
+      await t.mutation(api.multiplayer.makeMove, {
+        sessionId, sessionToken: host.sessionToken, move: { action: "draw" },
+      });
+      bs = await state();
+      ({ hand, top, playable } = findPlayable(bs));
+      if (!playable) {
+        await t.mutation(api.multiplayer.makeMove, {
+          sessionId, sessionToken: host.sessionToken, move: { action: "pass" },
+        });
+        await t.mutation(api.multiplayer.makeMove, {
+          sessionId, sessionToken: guest.sessionToken, move: { action: "draw" },
+        });
+        await t.mutation(api.multiplayer.makeMove, {
+          sessionId, sessionToken: guest.sessionToken, move: { action: "pass" },
+        });
+        bs = await state();
+        ({ hand, top, playable } = findPlayable(bs));
+      }
+    }
     expect(playable).toBeTruthy();
 
     const play = await t.mutation(api.multiplayer.makeMove, {
