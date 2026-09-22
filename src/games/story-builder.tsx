@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { evaluateSequence } from '@/lib/sequence-scorer';
 
 interface Panel {
   emoji: string;
@@ -10,6 +11,10 @@ interface Panel {
 interface Story {
   title: string;
   panels: Panel[];
+  /** Canonical orders whose members are interchangeable in any order. */
+  zones?: number[][];
+  /** Canonical order pairs that may be swapped freely. */
+  swappable?: [number, number][];
 }
 
 const allStories: Record<number, Story> = {
@@ -39,6 +44,7 @@ const allStories: Record<number, Story> = {
       { emoji: '☀️', text: 'Give it sunlight', order: 4 },
       { emoji: '🌸', text: 'Flower blooms!', order: 5 },
     ],
+    zones: [[3, 4]],
   },
   4: {
     title: 'Baking Cookies',
@@ -71,6 +77,7 @@ const allStories: Record<number, Story> = {
       { emoji: '📸', text: 'Take photos', order: 5 },
       { emoji: '🏠', text: 'Return home', order: 6 },
     ],
+    zones: [[3, 4, 5]],
   },
   7: {
     title: 'The Lost Dog',
@@ -83,6 +90,7 @@ const allStories: Record<number, Story> = {
       { emoji: '📱', text: 'Calls owner', order: 6 },
       { emoji: '🤗', text: 'Reunited!', order: 7 },
     ],
+    zones: [[2, 3, 4, 5]],
   },
   8: {
     title: 'Birthday Surprise',
@@ -96,6 +104,7 @@ const allStories: Record<number, Story> = {
       { emoji: '🎉', text: 'Party time!', order: 7 },
       { emoji: '😴', text: 'Tired but happy', order: 8 },
     ],
+    zones: [[1, 2, 3]],
   },
   9: {
     title: 'Science Fair Project',
@@ -124,6 +133,7 @@ const allStories: Record<number, Story> = {
       { emoji: '😴', text: 'Sleep in tent', order: 9 },
       { emoji: '🏠', text: 'Head home', order: 10 },
     ],
+    zones: [[6, 7]],
   },
 };
 
@@ -196,19 +206,14 @@ function StoryBuilderGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   }, [phase, selectedIndex]);
 
   const checkOrder = useCallback(() => {
-    let correct = 0;
-    currentOrder.forEach((panel, i) => {
-      if (panel.order === i + 1) correct++;
-    });
+    const { flags, accuracy } = evaluateSequence(currentOrder, story);
+    const correct = flags.filter(Boolean).length;
 
-    const accuracy = correct / story.panels.length;
     const newScore = Math.round(accuracy * 300);
     onScore(newScore);
     onProgress(accuracy);
 
-    const colors = currentOrder.map((panel, i) =>
-      panel.order === i + 1 ? '#4ade80' : '#ff6e6c'
-    );
+    const colors = currentOrder.map((_, i) => (flags[i] ? '#4ade80' : '#ff6e6c'));
     setResultColors(colors);
     setPhase('result');
 
@@ -218,8 +223,7 @@ function StoryBuilderGame({ stage, onScore, onProgress, onEnd }: GameProps) {
       schedule(() => {
         if (endedRef.current) return;
         endedRef.current = true;
-        const ratio = correct / story.panels.length;
-        const stars = ratio >= 0.75 ? 3 : ratio >= 0.4 ? 2 : 1;
+        const stars = accuracy >= 0.75 ? 3 : accuracy >= 0.4 ? 2 : 1;
         onEnd({
           score: newScore + 50,
           stars,
@@ -240,8 +244,7 @@ function StoryBuilderGame({ stage, onScore, onProgress, onEnd }: GameProps) {
       schedule(() => {
         if (endedRef.current) return;
         endedRef.current = true;
-        const ratio = correct / story.panels.length;
-        const stars = ratio >= 0.75 ? 3 : ratio >= 0.4 ? 2 : 1;
+        const stars = accuracy >= 0.75 ? 3 : accuracy >= 0.4 ? 2 : 1;
         onEnd({ score: newScore, stars, summary });
       }, 2500);
     }

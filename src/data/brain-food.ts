@@ -81,7 +81,7 @@ export const BRAIN_FOOD: BrainFoodCard[] = [
     id: 'calm-on-purpose',
     emoji: '🌬️',
     title: 'Calm is trainable',
-    takeaway: 'Slow breathing literally changes your nervous system — it is the fastest "off switch" we know of.',
+    takeaway: 'Slow breathing can change your nervous system — one of the fastest calm-down tools we know of.',
     body: 'Slow, rhythmic breathing (about 5–6 breaths a minute) activates the parasympathetic nervous system — the body\'s built-in calming circuit. It is used everywhere from therapy rooms to Navy SEAL training, and it is why the Breathe tab exists.',
     source: 'Research on heart-rate variability and paced breathing (Zaccaro et al., 2018)',
     categories: ['breathe', 'focus'],

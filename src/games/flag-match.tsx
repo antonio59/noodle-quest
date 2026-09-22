@@ -105,10 +105,46 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+// Most visually confusable flag per country (Jev content audit) — preferred
+// wrong options teach kids to actually look at the flags.
+const CONFUSABLE: Record<string, string> = {
+  'Argentina': 'Brazil',          'Australia': 'New Zealand',    'Austria': 'Germany',
+  'Bangladesh': 'Pakistan',       'Belgium': 'Germany',          'Brazil': 'Mexico',
+  'Bulgaria': 'Russia',           'Cambodia': 'Thailand',        'Canada': 'Finland',
+  'Chile': 'United States',       'China': 'Vietnam',            'Colombia': 'Venezuela',
+  'Croatia': 'Hungary',           'Czech Republic': 'Slovakia',  'Denmark': 'Norway',
+  'Egypt': 'United Arab Emirates','Estonia': 'Iceland',          'Ethiopia': 'Kenya',
+  'Finland': 'Iceland',           'France': 'Ireland',           'Georgia': 'Switzerland',
+  'Germany': 'Netherlands',       'Ghana': 'Ethiopia',           'Greece': 'Finland',
+  'Hungary': 'Russia',            'Iceland': 'Finland',          'India': 'Pakistan',
+  'Indonesia': 'Netherlands',     'Ireland': 'France',           'Israel': 'Jordan',
+  'Italy': 'France',              'Japan': 'Indonesia',          'Jordan': 'Kuwait',
+  'Kazakhstan': 'Uzbekistan',     'Kenya': 'Uganda',             'Kuwait': 'Qatar',
+  'Latvia': 'Estonia',            'Lithuania': 'Latvia',         'Malaysia': 'Singapore',
+  'Mexico': 'Italy',              'Morocco': 'Tunisia',          'Myanmar': 'Thailand',
+  'Nepal': 'Sri Lanka',           'Netherlands': 'Indonesia',    'New Zealand': 'Australia',
+  'Nigeria': 'Indonesia',         'Norway': 'Sweden',            'Pakistan': 'Bangladesh',
+  'Peru': 'Colombia',             'Philippines': 'Singapore',    'Poland': 'Indonesia',
+  'Portugal': 'Belgium',          'Qatar': 'Kuwait',             'Romania': 'Bulgaria',
+  'Russia': 'Netherlands',        'Saudi Arabia': 'United Arab Emirates', 'Serbia': 'Russia',
+  'Singapore': 'Malaysia',        'Slovakia': 'Czech Republic',  'Slovenia': 'Slovakia',
+  'South Africa': 'Netherlands',  'South Korea': 'Japan',        'Spain': 'Italy',
+  'Sri Lanka': 'Myanmar',         'Sweden': 'Denmark',           'Switzerland': 'Austria',
+  'Taiwan': 'China',              'Tanzania': 'Uganda',          'Thailand': 'Netherlands',
+  'Tunisia': 'Turkey',            'Turkey': 'Malaysia',          'Uganda': 'Tanzania',
+  'Ukraine': 'Bulgaria',          'United Arab Emirates': 'Qatar','United Kingdom': 'New Zealand',
+  'United States': 'Australia',   'Uzbekistan': 'Kazakhstan',    'Venezuela': 'Colombia',
+  'Vietnam': 'China',
+};
+
 function pickWrongOptions(correct: Country, pool: Country[], count: number): Country[] {
-  const sameContinent = pool.filter(c => c.code !== correct.code && c.continent === correct.continent);
-  const other         = pool.filter(c => c.code !== correct.code && c.continent !== correct.continent);
-  const candidates    = [...shuffle(sameContinent), ...shuffle(other)];
+  const confusable = CONFUSABLE[correct.name]
+    ? pool.find(c => c.name === CONFUSABLE[correct.name])
+    : undefined;
+  const rest = pool.filter(c => c.code !== correct.code && c !== confusable);
+  const sameContinent = rest.filter(c => c.continent === correct.continent);
+  const other         = rest.filter(c => c.continent !== correct.continent);
+  const candidates    = [...(confusable ? [confusable] : []), ...shuffle(sameContinent), ...shuffle(other)];
   return candidates.slice(0, count);
 }
 

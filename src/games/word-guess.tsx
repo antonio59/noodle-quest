@@ -8,8 +8,10 @@ type Mark = 'correct' | 'present' | 'absent';
 type Phase = 'ready' | 'playing' | 'done';
 
 const WORD_LENGTH = 5;
+// Proper nouns (cities, countries, planets) stay out of the answer pool —
+// great for themed clues elsewhere, unfair as hidden Wordle answers.
 const WORD_POOL = EN_GB_CORE_WORDS
-  .filter(w => w.length === WORD_LENGTH && !w.banned)
+  .filter(w => w.length === WORD_LENGTH && !w.banned && !w.tags.includes('proper-noun'))
   .map(w => w.normalised);
 
 const CONFIG: Record<number, { rounds: number; maxGuesses: number }> = {

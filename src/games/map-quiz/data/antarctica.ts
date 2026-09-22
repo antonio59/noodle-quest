@@ -9,7 +9,7 @@ export const antarcticaDataset: QuizDataset = {
   id: 'antarctica',
   title: 'Antarctic Territorial Claims',
   emoji: '🧊',
-  description: 'Can you name the countries with territorial claims in Antarctica?',
+  description: 'Can you name the 7 countries with territorial claims in Antarctica?',
   mapComponent: AntarcticaMap,
   timeLimit: 3 * 60,
   answers: [
@@ -20,6 +20,5 @@ export const antarcticaDataset: QuizDataset = {
     a('au', 'Australia', 60, 18),
     a('cl', 'Chile', 38, 22),
     a('ar', 'Argentina', 42, 20),
-    a('br', 'Brazil', 48, 24),
   ],
 };

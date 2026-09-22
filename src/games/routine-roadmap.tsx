@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { evaluateSequence } from '@/lib/sequence-scorer';
 
 interface Task {
   emoji: string;
@@ -10,6 +11,10 @@ interface Task {
 interface Routine {
   name: string;
   tasks: Task[];
+  /** Canonical orders whose members are interchangeable in any order. */
+  zones?: number[][];
+  /** Canonical order pairs that may be swapped freely. */
+  swappable?: [number, number][];
 }
 
 const allRoutines: Record<number, Routine> = {
@@ -29,6 +34,7 @@ const allRoutines: Record<number, Routine> = {
       { emoji: '👖', text: 'Put on pants', order: 3 },
       { emoji: '👟', text: 'Put on shoes', order: 4 },
     ],
+    zones: [[1, 2, 3]],
   },
   3: {
     name: 'Morning Routine',
@@ -39,6 +45,7 @@ const allRoutines: Record<number, Routine> = {
       { emoji: '🥣', text: 'Eat breakfast', order: 4 },
       { emoji: '🎒', text: 'Pack bag', order: 5 },
     ],
+    zones: [[2, 3, 4, 5]],
   },
   4: {
     name: 'Making a Sandwich',
@@ -50,6 +57,7 @@ const allRoutines: Record<number, Routine> = {
       { emoji: '🍞', text: 'Put top bread', order: 5 },
       { emoji: '🔪', text: 'Cut in half', order: 6 },
     ],
+    zones: [[2, 3, 4]],
   },
   5: {
     name: 'Baking Cookies',
@@ -62,6 +70,7 @@ const allRoutines: Record<number, Routine> = {
       { emoji: '❄️', text: 'Let cool', order: 6 },
       { emoji: '😋', text: 'Enjoy!', order: 7 },
     ],
+    swappable: [[2, 3], [3, 4]],
   },
   6: {
     name: 'Going to School',
@@ -74,6 +83,7 @@ const allRoutines: Record<number, Routine> = {
       { emoji: '👋', text: 'Say goodbye', order: 6 },
       { emoji: '🚌', text: 'Catch bus', order: 7 },
     ],
+    zones: [[3, 4, 5]],
   },
   7: {
     name: 'Doing Homework',
@@ -87,6 +97,7 @@ const allRoutines: Record<number, Routine> = {
       { emoji: '🎒', text: 'Pack for tomorrow', order: 7 },
       { emoji: '🎮', text: 'Free time!', order: 8 },
     ],
+    zones: [[2, 3, 4]],
   },
   8: {
     name: 'Plan Your Day',
@@ -116,6 +127,7 @@ const allRoutines: Record<number, Routine> = {
       { emoji: '🧹', text: 'Clean up', order: 9 },
       { emoji: '💤', text: 'Rest!', order: 10 },
     ],
+    swappable: [[1, 2], [3, 4], [5, 6]],
   },
   10: {
     name: 'Science Experiment',
@@ -227,19 +239,14 @@ function RoutineRoadmapGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   }, [currentOrder.length]);
 
   const checkOrder = useCallback(() => {
-    let correct = 0;
-    currentOrder.forEach((task, i) => {
-      if (task.order === i + 1) correct++;
-    });
+    const { flags, accuracy } = evaluateSequence(currentOrder, routine);
+    const correct = flags.filter(Boolean).length;
 
-    const accuracy = correct / routine.tasks.length;
     const newScore = Math.round(accuracy * 300);
     onScore(newScore);
     onProgress(accuracy);
 
-    const colors = currentOrder.map((task, i) =>
-      task.order === i + 1 ? '#4ade80' : '#ff6e6c'
-    );
+    const colors = currentOrder.map((_, i) => (flags[i] ? '#4ade80' : '#ff6e6c'));
     setResultColors(colors);
     setPhase('result');
 
@@ -249,8 +256,7 @@ function RoutineRoadmapGame({ stage, onScore, onProgress, onEnd }: GameProps) {
       schedule(() => {
         if (endedRef.current) return;
         endedRef.current = true;
-        const ratio = correct / routine.tasks.length;
-        const stars = ratio >= 0.75 ? 3 : ratio >= 0.4 ? 2 : 1;
+        const stars = accuracy >= 0.75 ? 3 : accuracy >= 0.4 ? 2 : 1;
         onEnd({
           score: newScore + 50,
           stars,
@@ -273,8 +279,7 @@ function RoutineRoadmapGame({ stage, onScore, onProgress, onEnd }: GameProps) {
       schedule(() => {
         if (endedRef.current) return;
         endedRef.current = true;
-        const ratio = correct / routine.tasks.length;
-        const stars = ratio >= 0.75 ? 3 : ratio >= 0.4 ? 2 : 1;
+        const stars = accuracy >= 0.75 ? 3 : accuracy >= 0.4 ? 2 : 1;
         onEnd({
           score: newScore,
           stars,

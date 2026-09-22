@@ -9,7 +9,7 @@ export const ukDataset: QuizDataset = {
   id: 'uk',
   title: 'UK Cities and Towns',
   emoji: '🇬🇧',
-  description: 'Can you name these 70 major UK cities and towns?',
+  description: 'Can you name these 64 major UK cities and towns?',
   mapComponent: UkMap,
   timeLimit: 10 * 60,
   answers: [
@@ -84,13 +84,6 @@ export const ukDataset: QuizDataset = {
     a('londonderry', 'Londonderry', 14, 12, 'derry'),
     a('lisburn', 'Lisburn', 16, 16),
     a('newry', 'Newry', 16, 18),
-
-    // Ireland (Republic)
-    a('dublin', 'Dublin', 12, 16),
-    a('cork', 'Cork', 10, 22),
-    a('limerick', 'Limerick', 10, 20),
-    a('galway', 'Galway', 8, 18),
-    a('waterford', 'Waterford', 12, 22),
   ],
 };
 
