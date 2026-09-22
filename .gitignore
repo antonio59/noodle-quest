@@ -28,6 +28,10 @@ dist-ssr
 test-results
 playwright-report
 
+# Jev content audit reports (generated)
+audit-report.json
+audit-report.md
+
 # Local wrangler/Cloudflare state
 .wrangler
 .claude/worktrees/

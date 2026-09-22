@@ -16,7 +16,8 @@
     "convex:dev": "npx convex dev",
     "convex:deploy": "CONVEX_DEPLOYMENT=prod:incredible-lobster-12 npx convex deploy --yes",
     "pages:dev": "npm run build && npx wrangler pages dev dist",
-    "pages:deploy": "npm run build && npx wrangler pages deploy dist"
+    "pages:deploy": "npm run build && npx wrangler pages deploy dist",
+    "audit:content": "tsx scripts/jev-audit/index.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.6.1",
@@ -40,6 +41,7 @@
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@typesafe-ai/sdk": "^0.6.0",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.11",
     "convex-test": "^0.0.53",
@@ -48,6 +50,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "jsdom": "^29.0.2",
+    "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.16",
