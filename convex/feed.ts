@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { playerFromSession } from "./model/auth";
+import { isAllowedGiphyUrl } from "./model/giphy";
 
 const MAX_POST_LENGTH = 2000;
 
@@ -9,19 +10,6 @@ const CLIENT_POST_TYPES = v.union(
   v.literal("gif_url"),
   v.literal("sticker"),
 );
-
-function isAllowedGiphyUrl(content: string): boolean {
-  try {
-    const url = new URL(content);
-    if (url.protocol !== "https:") return false;
-    const host = url.hostname.toLowerCase();
-    if (host === "giphy.com" || host === "i.giphy.com") return true;
-    // media*.giphy.com (e.g. media0.giphy.com, media1.giphy.com)
-    return /^media\d*\.giphy\.com$/.test(host);
-  } catch {
-    return false;
-  }
-}
 
 export const createPost = mutation({
   args: {

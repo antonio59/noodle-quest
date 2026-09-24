@@ -1,55 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Send, Smile, Image, AtSign, X, Search, MessageCircle, Zap, Reply, ArrowDown } from 'lucide-react';
 import { getGameName } from '@/lib/game-registry';
-
-const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY as string | undefined;
-
-interface GifItem {
-  id: string;
-  title: string;
-  preview: string;
-  url: string;
-  width: number;
-  height: number;
-}
-
-function mapGiphyItem(g: any): GifItem {
-  return {
-    id: g.id,
-    title: g.title ?? '',
-    preview: g.images?.fixed_width_small?.url ?? g.images?.fixed_width?.url ?? '',
-    url: g.images?.fixed_width?.url ?? g.images?.downsized_medium?.url ?? '',
-    width: Number(g.images?.fixed_width?.width ?? 200),
-    height: Number(g.images?.fixed_width?.height ?? 200),
-  };
-}
-
-async function searchGifs(query: string): Promise<GifItem[]> {
-  if (!GIPHY_API_KEY) return [];
-  try {
-    const res = await fetch(
-      `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg`
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.data ?? []).map(mapGiphyItem);
-  } catch { return []; }
-}
-
-async function getTrendingGifs(): Promise<GifItem[]> {
-  if (!GIPHY_API_KEY) return [];
-  try {
-    const res = await fetch(
-      `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=24&rating=pg`
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.data ?? []).map(mapGiphyItem);
-  } catch { return []; }
-}
+import type { GifItem, GifSearchStatus } from '../../convex/gifs';
 
 const QUICK_EMOJIS = [
   '😀','😂','🤣','😍','🥰','😎','🤩','🥳',
@@ -172,8 +127,11 @@ export function Feed() {
   const [showGif, setShowGif] = useState(false);
   const [gifQuery, setGifQuery] = useState('');
   const [gifResults, setGifResults] = useState<GifItem[]>([]);
-  const [gifLoading, setGifLoading] = useState(false);
+  const [gifLoading, setGifLoading] = useState(true);
+  const [gifStatus, setGifStatus] = useState<GifSearchStatus>('ok');
   const gifSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  // Only the newest search may update the picker; slower stale replies are dropped.
+  const gifRequestId = useRef(0);
   const [showMention, setShowMention] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
@@ -206,15 +164,27 @@ export function Feed() {
   const createPost = useMutation(api.feed.createPost);
   const toggleReaction = useMutation(api.feed.toggleReaction);
 
+  const searchGifs = useAction(api.gifs.search);
+  const sessionToken = player?.sessionToken;
+
   const loadGifs = useCallback(async (query: string) => {
+    if (!sessionToken) return;
+    const requestId = ++gifRequestId.current;
     setGifLoading(true);
-    const results = query.trim() ? await searchGifs(query.trim()) : await getTrendingGifs();
-    setGifResults(results);
+    let result: { status: GifSearchStatus; items: GifItem[] };
+    try {
+      result = await searchGifs({ sessionToken, query });
+    } catch {
+      result = { status: 'unavailable', items: [] };
+    }
+    if (requestId !== gifRequestId.current) return;
+    setGifStatus(result.status);
+    setGifResults(result.items);
     setGifLoading(false);
-  }, []);
+  }, [sessionToken, searchGifs]);
 
   useEffect(() => {
-    if (!showGif || !GIPHY_API_KEY) return;
+    if (!showGif) return;
     if (gifSearchTimer.current) clearTimeout(gifSearchTimer.current);
     gifSearchTimer.current = setTimeout(() => loadGifs(gifQuery), gifQuery ? 400 : 0);
     return () => { if (gifSearchTimer.current) clearTimeout(gifSearchTimer.current); };
@@ -697,7 +667,7 @@ export function Feed() {
           {/* GIF picker */}
           {showGif && (
             <div className="bg-card rounded-xl border border-white/10 overflow-hidden">
-              {GIPHY_API_KEY ? (
+              {gifStatus !== 'unconfigured' ? (
                 <div className="p-2">
                   <div className="flex items-center gap-2 mb-2 bg-surface rounded-lg px-3 py-2">
                     <Search size={14} className="text-text-muted flex-shrink-0" />
@@ -721,7 +691,9 @@ export function Feed() {
                       <div className="text-center text-text-muted text-xs py-8 animate-pulse">Loading...</div>
                     ) : gifResults.length === 0 ? (
                       <div className="text-center text-text-muted text-xs py-8">
-                        {gifQuery ? 'No GIFs found — try a different search' : 'Loading trending GIFs...'}
+                        {gifStatus === 'unavailable'
+                          ? "Couldn't reach GIPHY — try again in a bit"
+                          : gifQuery ? 'No GIFs found — try a different search' : 'No trending GIFs right now'}
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-1">
@@ -745,8 +717,8 @@ export function Feed() {
               ) : (
                 <div className="p-6 text-center">
                   <Image size={24} className="mx-auto text-text-muted mb-2" />
-                  <p className="text-sm text-text-muted">GIF search is not configured</p>
-                  <p className="text-xs text-text-muted/60 mt-1">Add VITE_GIPHY_API_KEY to enable</p>
+                  <p className="text-sm text-text-muted">GIFs aren't switched on yet</p>
+                  <p className="text-xs text-text-muted/60 mt-1">Emoji still work — try the smiley button</p>
                 </div>
               )}
             </div>
