@@ -21,6 +21,8 @@ interface Entry {
   bestFor?: string[];
   minPlayers?: number;
   maxPlayers?: number;
+  /** Seat range for pass & play on one device. */
+  passAndPlay?: { min: number; max: number };
 }
 
 function reg(id: string, meta: Entry, loader: () => Promise<{ default: any }>) {
@@ -260,6 +262,7 @@ reg('checkers', {
   description: 'Jump and capture your way to victory!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
+  passAndPlay: { min: 2, max: 2 },
 }, () => import('@/games/checkers'));
 
 reg('chess', {
@@ -267,6 +270,7 @@ reg('chess', {
   description: 'The royal game — checkmate the AI king!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
+  passAndPlay: { min: 2, max: 2 },
 }, () => import('@/games/chess'));
 
 reg('connect-four', {
@@ -274,6 +278,7 @@ reg('connect-four', {
   description: 'Drop discs to connect four in a row!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
+  passAndPlay: { min: 2, max: 2 },
 }, () => import('@/games/connect-four'));
 
 reg('connect-lines', {
@@ -299,6 +304,7 @@ reg('ludo', {
   description: 'Roll the dice and race all 4 pieces home!',
   category: 'board', stages: 99,
   minPlayers: 2, maxPlayers: 4,
+  passAndPlay: { min: 2, max: 4 },
 }, () => import('@/games/ludo'));
 
 reg('minesweeper', {
@@ -312,6 +318,7 @@ reg('scrabble', {
   description: 'Build words on the board for maximum points!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 4,
+  passAndPlay: { min: 2, max: 4 },
 }, () => import('@/games/scrabble'));
 
 reg('score-four', {
@@ -319,6 +326,7 @@ reg('score-four', {
   description: 'Connect Four in 3D — line up 4 in any direction!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
+  passAndPlay: { min: 2, max: 2 },
 }, () => import('@/games/score-four'));
 
 reg('snakes-ladders', {
@@ -326,6 +334,7 @@ reg('snakes-ladders', {
   description: 'Classic race game — climb ladders, dodge snakes!',
   category: 'board', stages: 99,
   minPlayers: 2, maxPlayers: 2,
+  passAndPlay: { min: 2, max: 4 },
 }, () => import('@/games/snakes-ladders'));
 
 reg('tic-tac-toe', {
@@ -333,6 +342,7 @@ reg('tic-tac-toe', {
   description: 'Classic X and O — beat the AI!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
+  passAndPlay: { min: 2, max: 2 },
 }, () => import('@/games/tic-tac-toe'));
 
 reg('uno', {
@@ -340,6 +350,7 @@ reg('uno', {
   description: 'Match colors and numbers — be first to empty your hand!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
+  passAndPlay: { min: 2, max: 2 },
 }, () => import('@/games/uno'));
 
 reg('word-guess', {

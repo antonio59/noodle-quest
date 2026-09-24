@@ -15,6 +15,9 @@ import { computeBonusTiers, getBonusTier, applyBonus } from '@/lib/bonus-multipl
 import type { GameResult } from '@/types';
 import { ReportIssueModal } from '@/components/ReportIssueModal';
 import { GameErrorBoundary } from '@/components/GameErrorBoundary';
+import { SeatPicker } from '@/components/pass-and-play/SeatPicker';
+import { MatchResult } from '@/components/pass-and-play/MatchResult';
+import { usePassAndPlay } from '@/components/pass-and-play/usePassAndPlay';
 
 export function PlayGame() {
   const navigate = useNavigate();
@@ -30,6 +33,7 @@ export function PlayGame() {
   const challengeId = (location.state as any)?.challengeId as string | undefined;
   const challengeTarget = (location.state as any)?.challengeTarget as number | undefined;
   const challengerName = (location.state as any)?.challengerName as string | undefined;
+  const wantsPassAndPlay = (location.state as any)?.passAndPlay === true;
 
   const [currentStage, setCurrentStage] = useState(stage);
   const [score, setScore] = useState(0);
@@ -68,6 +72,12 @@ export function PlayGame() {
 
   // Look up game metadata (no component import)
   const gameMeta = gameId ? getGameMeta(gameId) : undefined;
+
+  // Pass & play: people sharing this device, no AI, nothing saved.
+  const passAndPlayRange = wantsPassAndPlay ? gameMeta?.passAndPlay : undefined;
+  const isPassAndPlay = !!passAndPlayRange;
+  const local = usePassAndPlay(gameId, gameMeta?.name ?? '');
+  const family = useQuery(api.auth.getAllPlayers, isPassAndPlay ? {} : 'skip');
 
   // Fetch player's progress for this game to enable stage selection
   const playerProgress = useQuery(
@@ -200,7 +210,39 @@ export function PlayGame() {
   const minPlayers = gameMeta.minPlayers ?? 2;
   const maxPlayers = gameMeta.maxPlayers ?? 2;
   // Lobby only appears for multi-player games so the user can choose how many AI opponents
-  const showLobby = !lobbyDone && maxPlayers > 2 && !isMultiplayer;
+  const showLobby = !lobbyDone && maxPlayers > 2 && !isMultiplayer && !isPassAndPlay;
+
+  if (passAndPlayRange) {
+    if (!local.seats) {
+      return (
+        <SeatPicker
+          gameName={gameMeta.name}
+          gameEmoji={gameMeta.emoji}
+          min={passAndPlayRange.min}
+          max={passAndPlayRange.max}
+          me={player ? { name: player.name, avatar: player.avatar } : null}
+          family={(family ?? []).map(p => ({ name: p.name, avatar: p.avatar }))}
+          onStart={local.start}
+          onCancel={() => navigate('/games?tab=board')}
+        />
+      );
+    }
+    if (local.result) {
+      return (
+        <MatchResult
+          gameName={gameMeta.name}
+          gameEmoji={gameMeta.emoji}
+          seats={local.result.seats}
+          winnerSeat={local.result.winnerSeat}
+          tally={local.tally}
+          shareState={local.shareState}
+          onShare={local.share}
+          onRematch={local.rematch}
+          onDone={() => navigate('/games?tab=board')}
+        />
+      );
+    }
+  }
 
   // Joiner waiting-in-lobby screen: has sessionId, no inviteCode of their own,
   // and the session isn't playing yet.
@@ -429,6 +471,10 @@ export function PlayGame() {
   }
 
   const handleEnd = async (result: GameResult) => {
+    if (isPassAndPlay) {
+      local.finishRound(result);
+      return;
+    }
     // Guarantee minimum 10 points for participation, then apply under-played bonus.
     const baseScore = Math.max(result.score, 10);
     const finalScore = applyBonus(baseScore, bonusMultiplier);
@@ -683,6 +729,12 @@ export function PlayGame() {
             <span className="text-sm font-semibold hidden sm:inline">Report</span>
           </button>
         </div>
+        {isPassAndPlay ? (
+          <div className="text-center px-2 py-1">
+            <div className="font-semibold text-sm">{gameMeta.emoji} {gameMeta.name}</div>
+            <div className="text-text-muted text-xs">Pass & play</div>
+          </div>
+        ) : (
         <button
           onClick={() => maxUnlocked > 1 && setShowStagePicker(!showStagePicker)}
           className="text-center px-2 py-1 rounded-lg hover:bg-card/40 transition-colors"
@@ -702,8 +754,9 @@ export function PlayGame() {
             />
           </div>
         </button>
+        )}
         <div className="flex items-center gap-2 min-w-[60px] justify-end pr-2">
-          {bonusTier && (
+          {bonusTier && !isPassAndPlay && (
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-card border border-white/5 ${bonusTier.color}`}
               title={`Score multiplied by ${bonusTier.multiplier}× for trying this game`}
@@ -711,7 +764,7 @@ export function PlayGame() {
               {bonusTier.label}
             </span>
           )}
-          <div className="text-accent font-bold">{score}</div>
+          {!isPassAndPlay && <div className="text-accent font-bold">{score}</div>}
         </div>
       </div>
 
@@ -794,7 +847,7 @@ export function PlayGame() {
           </div>
         }>
           {GameComponent && createElement(GameComponent, {
-            key: `${gameId}-${currentStage}-${numPlayers}-${sessionId ?? 'solo'}`,
+            key: `${gameId}-${currentStage}-${numPlayers}-${sessionId ?? 'solo'}-${local.round}`,
             stage: currentStage,
             onScore: (pts: number) => setScore(s => s + pts),
             onProgress: setProgress,
@@ -804,7 +857,8 @@ export function PlayGame() {
             multiplayerState: multiplayerView,
             onMultiplayerMove: handleMultiplayerMove,
             aiDifficulty,
-            numPlayers,
+            numPlayers: local.seats?.length ?? numPlayers,
+            localSeats: local.seats ?? undefined,
           })}
         </Suspense>
         </GameErrorBoundary>

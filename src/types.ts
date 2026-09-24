@@ -16,6 +16,14 @@ export interface GameDefinition {
   minPlayers?: number;
   /** Maximum human players for an online multiplayer session. Defaults to 2. */
   maxPlayers?: number;
+  /** Seat range for pass & play on one device. Absent = not supported. */
+  passAndPlay?: { min: number; max: number };
+}
+
+/** A person at the table in pass & play. */
+export interface LocalSeat {
+  name: string;
+  avatar: string;
 }
 
 export interface MultiplayerSeat {
@@ -43,12 +51,17 @@ export interface GameProps {
   /** True when the page is hidden (tab switched, screen locked, incoming call).
    *  Games that run internal timers should freeze them while paused. */
   paused?: boolean;
+  /** Pass & play: every seat (1-indexed, in turn order) is a person on this
+   *  device. When set, games skip the AI and report `winnerSeat` in onEnd. */
+  localSeats?: LocalSeat[];
 }
 
 export interface GameResult {
   score: number;
   stars: number;
   summary: string;
+  /** Pass & play only: the winning 1-indexed seat, or 0 for a draw. */
+  winnerSeat?: number;
 }
 
 export interface MultiplayerState {

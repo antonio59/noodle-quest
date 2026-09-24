@@ -5,7 +5,7 @@ import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllGames } from '@/lib/game-registry';
 import { GAME_CATEGORIES, type GameCategory } from '@/types';
-import { Heart, Search, Play, Pause, Users, Wind, Star, Sparkles, Volume2, VolumeX, Moon } from 'lucide-react';
+import { Heart, Search, Play, Pause, Wind, Star, Sparkles, Volume2, VolumeX, Moon, Smartphone, Globe } from 'lucide-react';
 import { RequestGameModal } from '@/components/RequestGameModal';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { TRACKS } from '@/tracks/track-list';
@@ -156,6 +156,10 @@ export function GameHub() {
 
   const navigateToMultiplayer = (gameId: string) => {
     navigate(`/play/${gameId}`, { state: { stage: 1, fromTab: tab, multiplayer: true } });
+  };
+
+  const navigateToPassAndPlay = (gameId: string) => {
+    navigate(`/play/${gameId}`, { state: { stage: 1, fromTab: 'board', passAndPlay: true } });
   };
 
   const toggleFav = (id: string) => {
@@ -400,24 +404,37 @@ export function GameHub() {
                     {/* Stars + buttons anchored to card bottom for row alignment */}
                     <div className="mt-auto w-full">
                       <CardMeta {...statsFor(g.id)} size="lg" />
-                      <div className="flex gap-2 mt-3 w-full">
                       <button
                         type="button"
                         onClick={() => navigateToGame(g.id)}
-                        className="flex-1 bg-accent text-bg text-xs font-bold py-2.5 rounded-xl hover:brightness-110 transition-all active:scale-95"
+                        className="w-full mt-3 bg-accent text-bg text-xs font-bold py-2.5 rounded-xl hover:brightness-110 transition-all active:scale-95"
                       >
                         Play
                       </button>
-                      {isMulti && (
-                        <button
-                          type="button"
-                          onClick={() => navigateToMultiplayer(g.id)}
-                          className="flex-1 flex items-center justify-center gap-1 bg-surface border border-white/10 text-text-muted text-xs font-bold py-2.5 rounded-xl hover:bg-card-hover hover:text-accent hover:border-accent/30 transition-all active:scale-95"
-                        >
-                          <Users size={12} /> Friends
-                        </button>
+                      {(isMulti || g.passAndPlay) && (
+                        <div className="flex gap-1.5 mt-1.5 w-full">
+                          {g.passAndPlay && (
+                            <button
+                              type="button"
+                              onClick={() => navigateToPassAndPlay(g.id)}
+                              aria-label={`${g.name}: pass and play on this device`}
+                              className="flex-1 flex items-center justify-center gap-1 bg-surface border border-white/10 text-text-muted text-[11px] font-bold py-2 rounded-xl hover:bg-card-hover hover:text-accent hover:border-accent/30 transition-all active:scale-95"
+                            >
+                              <Smartphone size={12} aria-hidden /> Together
+                            </button>
+                          )}
+                          {isMulti && (
+                            <button
+                              type="button"
+                              onClick={() => navigateToMultiplayer(g.id)}
+                              aria-label={`${g.name}: play online with family`}
+                              className="flex-1 flex items-center justify-center gap-1 bg-surface border border-white/10 text-text-muted text-[11px] font-bold py-2 rounded-xl hover:bg-card-hover hover:text-accent hover:border-accent/30 transition-all active:scale-95"
+                            >
+                              <Globe size={12} aria-hidden /> Online
+                            </button>
+                          )}
+                        </div>
                       )}
-                      </div>
                     </div>
                   </div>
                 );

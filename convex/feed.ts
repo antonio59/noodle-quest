@@ -26,6 +26,9 @@ export const createPost = mutation({
   handler: async (ctx, args) => {
     const author = await playerFromSession(ctx, args.sessionToken);
     if (!author) return { error: "Not signed in." };
+    // Kid mode keeps chat activity-only; the UI hides the composer, this
+    // stops a direct API call from getting round it.
+    if (author.kidMode) return { error: "Chat is switched off in kid mode." };
     if (args.content.length === 0 || args.content.length > MAX_POST_LENGTH) {
       return { error: "Message must be 1-2000 characters." };
     }
@@ -62,6 +65,36 @@ export const createPost = mutation({
       replyToAuthorName,
       replyToContent,
       replyToType,
+    });
+    return { postId };
+  },
+});
+
+const MAX_MATCH_SUMMARY = 200;
+
+/**
+ * Share a pass & play result ("Mia beat Dad at Chess") to the activity feed.
+ * Opt-in from the result screen; no score or stars are recorded, since one
+ * device playing both sides can't be trusted for the leaderboard.
+ */
+export const postLocalMatch = mutation({
+  args: { sessionToken: v.string(), gameId: v.string(), summary: v.string() },
+  handler: async (ctx, args) => {
+    const author = await playerFromSession(ctx, args.sessionToken);
+    if (!author) return { error: "Not signed in." };
+    if (!/^[a-z0-9-]{1,40}$/.test(args.gameId)) return { error: "Unknown game." };
+    const summary = args.summary.trim();
+    if (summary.length === 0 || summary.length > MAX_MATCH_SUMMARY) {
+      return { error: `Result must be 1-${MAX_MATCH_SUMMARY} characters.` };
+    }
+    const postId = await ctx.db.insert("feed", {
+      authorId: author._id,
+      authorName: author.name,
+      authorAvatar: author.avatar,
+      type: "score",
+      content: `🏠 ${summary} (pass & play)`,
+      gameId: args.gameId,
+      createdAt: Date.now(),
     });
     return { postId };
   },
