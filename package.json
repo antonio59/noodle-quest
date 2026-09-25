@@ -18,7 +18,8 @@
     "pages:dev": "npm run build && npx wrangler pages dev dist",
     "pages:deploy": "npm run build && npx wrangler pages deploy dist",
     "audit:content": "tsx scripts/jev-audit/index.ts",
-    "art:build": "tsx scripts/game-art/build.ts"
+    "art:build": "tsx scripts/game-art/build.ts",
+    "og:build": "tsx scripts/og/build.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
