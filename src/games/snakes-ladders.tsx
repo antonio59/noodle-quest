@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/types';
+import { nextSeat, seatAt } from '@/lib/pass-and-play';
+import {
+  NO_SEATS, isLocalTable, localWinResult, withSeatAt,
+  LocalRaceHeader, LocalRaceTokens, LocalRaceProgress,
+} from './snakes-ladders-local';
 
 // Define AI difficulty levels
 const DIFFICULTY_LEVELS = {
@@ -58,8 +63,11 @@ function aiMove(aiPos: number, difficulty: 'easy' | 'medium' | 'hard'): number {
   return rollDie();
 }
 
-function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove }: GameProps) {
+function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove, localSeats }: GameProps) {
   const isOnline = !!multiplayerState;
+  // Pass & play: named people share this device, every seat is human.
+  const isLocal = isLocalTable(localSeats, isOnline);
+  const table = localSeats ?? NO_SEATS;
   const mySeat = isOnline ? multiplayerState.playerNumber : 1;
   const [playerPos, setPlayerPos] = useState(0);
   const [aiPos, setAiPos] = useState(0);
@@ -70,7 +78,10 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
   const difficulty = aiDifficulty || 'medium';
 
   const endedRef = useRef(false);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(isLocal); // pass & play skips the intro
+  // Pass & play: one square per seat (0 = not on the board yet).
+  const [seatPos, setSeatPos] = useState<number[]>(() => table.map(() => 0));
+  const [turnSeat, setTurnSeat] = useState(1);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const intervalsRef = useRef<ReturnType<typeof setInterval>[]>([]);
 
@@ -263,12 +274,47 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
     });
   };
 
+  // ── Pass & play: the seat whose turn it is rolls; no AI ──
+  const finishLocal = (seat: number) => {
+    setGameOver(true);
+    onMessage(`${seatAt(table, seat).name} reached 100! 🎉`);
+    // One round, first seat to 100 wins; play.tsx shows the result. endedRef
+    // is set inside the callback because schedule() skips it once true.
+    schedule(() => { endedRef.current = true; onEnd(localWinResult(table, seat)); }, 1000);
+  };
+
+  const rollLocal = () => {
+    const seat = turnSeat;
+    const name = seatAt(table, seat).name;
+    const from = seatPos[seat - 1] ?? 0;
+    const passTurn = () => setTurnSeat(nextSeat(seat, table.length));
+    const d = rollDie();
+    setDie(d);
+
+    if (from + d > BOARD_SIZE) {
+      onMessage(`${name} rolled ${d} — needs an exact roll to finish!`);
+      passTurn();
+      return;
+    }
+
+    const setPos = (p: number) => setSeatPos(prev => withSeatAt(prev, seat, p));
+    moveToken(from, d, setPos, name, (finalPos) => {
+      if (finalPos >= BOARD_SIZE) finishLocal(seat);
+      else passTurn();
+    });
+  };
+
   const handleRoll = () => {
     if (endedRef.current || gameOver || turn !== 'player' || animating) return;
 
     if (isOnline) {
       // Server rolls; the reconcile effect animates + commits the result.
       onMultiplayerMove?.({ action: 'roll' });
+      return;
+    }
+
+    if (isLocal) {
+      rollLocal();
       return;
     }
 
@@ -310,7 +356,9 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
 
   return (
     <div className="h-full flex flex-col items-center p-3">
-      {isOnline ? (
+      {isLocal ? (
+        <LocalRaceHeader seats={table} turnSeat={turnSeat} />
+      ) : isOnline ? (
         <div className="flex gap-2 mb-2 text-xs items-center flex-wrap justify-center">
           <span className={`bg-card rounded-lg px-3 py-1.5 font-bold ${turn === 'player' ? 'text-accent' : 'text-text-muted'}`}>
             🔴 You: {playerPos}
@@ -356,30 +404,35 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
               {isPlayer && !isAI && <span className="text-sm absolute">🔴</span>}
               {isAI && !isPlayer && <span className="text-sm absolute">🔵</span>}
               {isPlayer && isAI && <span className="text-sm absolute">🟣</span>}
+              {isLocal && <LocalRaceTokens seats={table} positions={seatPos} cell={cell} />}
             </div>
           );
         })}
       </div>
 
       {/* Progress bars */}
-      <div className="w-full max-w-[320px] flex flex-col gap-1">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-red-400 font-bold w-6">You</span>
-          <div className="flex-1 h-2 bg-card rounded-full overflow-hidden">
-            <div className="h-full bg-red-500 rounded-full transition-all duration-300"
-              style={{ width: `${Math.round((playerPos / BOARD_SIZE) * 100)}%` }} />
+      {isLocal ? (
+        <LocalRaceProgress seats={table} positions={seatPos} turnSeat={turnSeat} goal={BOARD_SIZE} />
+      ) : (
+        <div className="w-full max-w-[320px] flex flex-col gap-1">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-red-400 font-bold w-6">You</span>
+            <div className="flex-1 h-2 bg-card rounded-full overflow-hidden">
+              <div className="h-full bg-red-500 rounded-full transition-all duration-300"
+                style={{ width: `${Math.round((playerPos / BOARD_SIZE) * 100)}%` }} />
+            </div>
+            <span className="text-text-muted w-8 text-right">{playerPos}</span>
           </div>
-          <span className="text-text-muted w-8 text-right">{playerPos}</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-blue-400 font-bold w-6">AI</span>
-          <div className="flex-1 h-2 bg-card rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full transition-all duration-300"
-              style={{ width: `${Math.round((aiPos / BOARD_SIZE) * 100)}%` }} />
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-blue-400 font-bold w-6">AI</span>
+            <div className="flex-1 h-2 bg-card rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                style={{ width: `${Math.round((aiPos / BOARD_SIZE) * 100)}%` }} />
+            </div>
+            <span className="text-text-muted w-8 text-right">{aiPos}</span>
           </div>
-          <span className="text-text-muted w-8 text-right">{aiPos}</span>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-4">
         <SnakeDiceFace value={die} />
