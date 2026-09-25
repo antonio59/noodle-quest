@@ -3,7 +3,7 @@ import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { playLose, playWin } from '@/lib/feedback';
-import { addToTally, describeMatch, rotateSeats, type MatchTally } from '@/lib/pass-and-play';
+import { addToTally, rotateSeats, type MatchTally } from '@/lib/pass-and-play';
 import type { GameResult, LocalSeat } from '@/types';
 
 export type ShareState = 'idle' | 'sharing' | 'shared' | 'failed';
@@ -15,7 +15,7 @@ interface RoundResult {
 }
 
 /** Table state for one pass & play sitting: seats, rounds, tally, sharing. */
-export function usePassAndPlay(gameId: string | undefined, gameName: string) {
+export function usePassAndPlay(gameId: string | undefined) {
   const { player } = useAuth();
   const postLocalMatch = useMutation(api.feed.postLocalMatch);
 
@@ -47,13 +47,14 @@ export function usePassAndPlay(gameId: string | undefined, gameName: string) {
       const res = await postLocalMatch({
         sessionToken,
         gameId,
-        summary: describeMatch(result.seats, result.winnerSeat, gameName),
+        seatNames: result.seats.map(s => s.name),
+        winnerSeat: result.winnerSeat,
       });
       setShareState(res && 'postId' in res ? 'shared' : 'failed');
     } catch {
       setShareState('failed');
     }
-  }, [sessionToken, gameId, gameName, result, postLocalMatch]);
+  }, [sessionToken, gameId, result, postLocalMatch]);
 
   return {
     seats,

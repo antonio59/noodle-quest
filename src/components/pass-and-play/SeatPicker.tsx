@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, X } from 'lucide-react';
 import type { LocalSeat } from '@/types';
 import { GameArt } from '@/components/GameArt';
 import { GUEST_AVATARS, MAX_GUEST_NAME, SEAT_COLORS, seatListError } from '@/lib/pass-and-play';
+import { isValidSeatName } from '../../../convex/model/matchSummary';
 
 interface SeatPickerProps {
   gameId: string;
@@ -23,6 +24,7 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
 export function SeatPicker({ gameId, gameName, gameEmoji, min, max, me, family, onStart, onCancel }: SeatPickerProps) {
   const [seats, setSeats] = useState<LocalSeat[]>(() => (me ? [me] : []));
   const [guestName, setGuestName] = useState('');
+  const [guestError, setGuestError] = useState('');
 
   const isSeated = (name: string) => seats.some(s => sameName(s.name, name));
   const full = seats.length >= max;
@@ -39,6 +41,11 @@ export function SeatPicker({ gameId, gameName, gameEmoji, min, max, me, family, 
   const addGuest = () => {
     const name = guestName.trim().slice(0, MAX_GUEST_NAME);
     if (!name || full || isSeated(name)) return;
+    if (!isValidSeatName(name)) {
+      setGuestError("Names can use letters, numbers, spaces, ' and -");
+      return;
+    }
+    setGuestError('');
     const avatar = GUEST_AVATARS[seats.length % GUEST_AVATARS.length];
     setSeats(prev => [...prev, { name, avatar }]);
     setGuestName('');
@@ -150,7 +157,7 @@ export function SeatPicker({ gameId, gameName, gameEmoji, min, max, me, family, 
         >
           Let's play
         </button>
-        <p className="text-xs text-text-muted mt-2 h-4" role="status">{error ?? ''}</p>
+        <p className="text-xs text-text-muted mt-2 h-4" role="status">{guestError || error || ''}</p>
 
         <button
           type="button"

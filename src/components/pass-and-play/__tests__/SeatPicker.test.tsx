@@ -72,3 +72,12 @@ describe('SeatPicker', () => {
     expect(props.onCancel).toHaveBeenCalled();
   });
 });
+
+test('guest names must be a name the family feed will accept', () => {
+  renderPicker({ family: [] });
+  const input = screen.getByRole('textbox', { name: 'Guest name' });
+  fireEvent.change(input, { target: { value: 'Granny <3' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add guest' }));
+  expect(screen.getByRole('status')).toHaveTextContent("Names can use letters, numbers, spaces, ' and -");
+  expect(turnOrder()).toHaveLength(2); // Dad + the empty slot
+});

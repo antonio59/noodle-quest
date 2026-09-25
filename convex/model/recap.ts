@@ -58,10 +58,12 @@ export async function buildFamilyWeek(ctx: QueryCtx, now: number): Promise<Famil
     .withIndex("by_playedAt", q => q.gt("playedAt", since))
     .collect();
 
-  // Challenges have no time index; a family's table stays small.
-  const challenges = (await ctx.db.query("challenges").collect())
-    .filter(c => c.status === "completed" && (c.completedAt ?? 0) > since)
-    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+  const challenges = (await ctx.db
+    .query("challenges")
+    .withIndex("by_completed", q => q.gt("completedAt", since))
+    .order("desc")
+    .collect())
+    .filter(c => c.status === "completed");
 
   const ids = new Set<Id<"players">>([
     ...scores.map(s => s.playerId),

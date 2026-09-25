@@ -23,6 +23,7 @@ import type * as model_auth from "../model/auth.js";
 import type * as model_clues from "../model/clues.js";
 import type * as model_gameRules from "../model/gameRules.js";
 import type * as model_giphy from "../model/giphy.js";
+import type * as model_matchSummary from "../model/matchSummary.js";
 import type * as model_puzzles from "../model/puzzles.js";
 import type * as model_rateLimit from "../model/rateLimit.js";
 import type * as model_recap from "../model/recap.js";
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   "model/clues": typeof model_clues;
   "model/gameRules": typeof model_gameRules;
   "model/giphy": typeof model_giphy;
+  "model/matchSummary": typeof model_matchSummary;
   "model/puzzles": typeof model_puzzles;
   "model/rateLimit": typeof model_rateLimit;
   "model/recap": typeof model_recap;

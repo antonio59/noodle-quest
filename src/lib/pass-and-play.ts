@@ -2,6 +2,7 @@
 // server — scores aren't saved (playing both sides would farm stars), the
 // table just keeps a friendly tally of who won each round.
 import type { LocalSeat } from '@/types';
+import { describeMatchNames } from '../../convex/model/matchSummary';
 
 export const MAX_GUEST_NAME = 20;
 export const GUEST_AVATARS = ['🙂', '🐻', '🦊', '🐸', '🐼', '🦁', '🐯', '🐨'] as const;
@@ -22,11 +23,6 @@ export function nextSeat(seat: number, count: number): number {
   return seat >= count ? 1 : seat + 1;
 }
 
-function joinNames(names: string[]): string {
-  if (names.length <= 1) return names.join('');
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
 /**
  * One-line result for the end screen and the family feed.
  * `winnerSeat` is 1-indexed; 0 means a draw; undefined means no result.
@@ -36,14 +32,7 @@ export function describeMatch(
   winnerSeat: number | undefined,
   gameName: string,
 ): string {
-  const names = seats.map(s => s.name);
-  if (winnerSeat === undefined) return `${joinNames(names)} played ${gameName}`;
-  if (winnerSeat === 0) return `${joinNames(names)} drew at ${gameName}`;
-  const winner = seatAt(seats, winnerSeat).name;
-  const others = names.filter((_, i) => i !== winnerSeat - 1);
-  return others.length === 1
-    ? `${winner} beat ${others[0]} at ${gameName}`
-    : `${winner} won ${gameName} against ${joinNames(others)}`;
+  return describeMatchNames(seats.map(s => s.name), winnerSeat, gameName);
 }
 
 export function addToTally(

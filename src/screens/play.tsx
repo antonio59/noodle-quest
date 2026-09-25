@@ -77,7 +77,7 @@ export function PlayGame() {
   // Pass & play: people sharing this device, no AI, nothing saved.
   const passAndPlayRange = wantsPassAndPlay ? gameMeta?.passAndPlay : undefined;
   const isPassAndPlay = !!passAndPlayRange;
-  const local = usePassAndPlay(gameId, gameMeta?.name ?? '');
+  const local = usePassAndPlay(gameId);
   const family = useQuery(api.auth.getAllPlayers, isPassAndPlay ? {} : 'skip');
 
   // Fetch player's progress for this game to enable stage selection

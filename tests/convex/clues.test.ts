@@ -119,6 +119,18 @@ describe("clues.suggestClues", () => {
       .toBe("unavailable");
   });
 
+  test("only looks at a puzzle's worth of words, however many are sent", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-test");
+    const fetchMock = stubClaude(claudeReply({ clues: [] }));
+    const t = setup();
+    const mum = await signedUp(t, "Mum");
+    const flood = Array.from({ length: 10_000 }, (_, i) => `word${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + ((i / 26) % 26 | 0))}`);
+    await t.action(api.clues.suggestClues, { sessionToken: mum.sessionToken, words: flood });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const prompt: string = JSON.parse(String(init.body)).messages[0].content;
+    expect(prompt.split("\n").filter(l => l.startsWith("- ")).length).toBeLessThanOrEqual(15);
+  });
+
   test("rate-limits each player to 20 requests an hour", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-test");
     stubClaude(claudeReply({ clues: [] }));

@@ -24,7 +24,7 @@ afterEach(() => {
 
 describe('usePassAndPlay', () => {
   test('records each round and tallies wins by name across rotated rematches', () => {
-    const { result } = renderHook(() => usePassAndPlay('chess', 'Chess'));
+    const { result } = renderHook(() => usePassAndPlay('chess'));
     act(() => result.current.start([DAD, MIA, LEO]));
     act(() => result.current.finishRound(round(2)));
     expect(result.current.result).toEqual({ seats: [DAD, MIA, LEO], winnerSeat: 2 });
@@ -44,17 +44,17 @@ describe('usePassAndPlay', () => {
 
   test('sharing posts the match summary and reports success', async () => {
     postLocalMatch.mockResolvedValue({ postId: 'p1' });
-    const { result } = renderHook(() => usePassAndPlay('chess', 'Chess'));
+    const { result } = renderHook(() => usePassAndPlay('chess'));
     act(() => result.current.start([DAD, MIA]));
     act(() => result.current.finishRound(round(2)));
     await act(async () => { await result.current.share!(); });
-    expect(postLocalMatch).toHaveBeenCalledWith({ sessionToken: 'tok', gameId: 'chess', summary: 'Mia beat Dad at Chess' });
+    expect(postLocalMatch).toHaveBeenCalledWith({ sessionToken: 'tok', gameId: 'chess', seatNames: ['Dad', 'Mia'], winnerSeat: 2 });
     expect(result.current.shareState).toBe('shared');
   });
 
   test('a rejected or failed post shows as failed', async () => {
     postLocalMatch.mockResolvedValueOnce({ error: 'nope' }).mockRejectedValueOnce(new Error('offline'));
-    const { result } = renderHook(() => usePassAndPlay('chess', 'Chess'));
+    const { result } = renderHook(() => usePassAndPlay('chess'));
     act(() => result.current.start([DAD, MIA]));
     act(() => result.current.finishRound(round(1)));
     await act(async () => { await result.current.share!(); });
@@ -65,7 +65,7 @@ describe('usePassAndPlay', () => {
 
   test('no share action without a signed-in player', () => {
     signedIn = false;
-    const { result } = renderHook(() => usePassAndPlay('chess', 'Chess'));
+    const { result } = renderHook(() => usePassAndPlay('chess'));
     expect(result.current.share).toBeNull();
   });
 });

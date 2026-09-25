@@ -26,6 +26,9 @@ import {
  */
 
 const MODEL = "claude-opus-5";
+// Bound pre-auth work: only look at a puzzle's worth of input (plus slack
+// for blanks and duplicates) before anything else runs.
+const MAX_INPUT_WORDS = 30;
 const REQUESTS_PER_HOUR = 20;
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -63,7 +66,7 @@ function logApiError(err: unknown): void {
 export const suggestClues = action({
   args: { sessionToken: v.string(), words: v.array(v.string()), theme: v.optional(v.string()) },
   handler: async (ctx, args): Promise<ClueResult> => {
-    const words = cleanWordList(args.words);
+    const words = cleanWordList(args.words.slice(0, MAX_INPUT_WORDS));
     if (words.length === 0) return { status: "ok", clues: [] };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

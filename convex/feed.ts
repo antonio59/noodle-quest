@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { playerFromSession } from "./model/auth";
 import { isAllowedGiphyUrl } from "./model/giphy";
+import { PASS_AND_PLAY_GAMES, describeMatchNames, isValidSeatName } from "./model/matchSummary";
 
 const MAX_POST_LENGTH = 2000;
 
@@ -70,23 +71,41 @@ export const createPost = mutation({
   },
 });
 
-const MAX_MATCH_SUMMARY = 200;
-
 /**
  * Share a pass & play result ("Mia beat Dad at Chess") to the activity feed.
  * Opt-in from the result screen; no score or stars are recorded, since one
  * device playing both sides can't be trusted for the leaderboard.
+ *
+ * The sentence is written here from seat names + winner — never taken as
+ * free text — so kid mode stays activity-only.
  */
 export const postLocalMatch = mutation({
-  args: { sessionToken: v.string(), gameId: v.string(), summary: v.string() },
+  args: {
+    sessionToken: v.string(),
+    gameId: v.string(),
+    seatNames: v.array(v.string()),
+    winnerSeat: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const author = await playerFromSession(ctx, args.sessionToken);
     if (!author) return { error: "Not signed in." };
-    if (!/^[a-z0-9-]{1,40}$/.test(args.gameId)) return { error: "Unknown game." };
-    const summary = args.summary.trim();
-    if (summary.length === 0 || summary.length > MAX_MATCH_SUMMARY) {
-      return { error: `Result must be 1-${MAX_MATCH_SUMMARY} characters.` };
+    const gameName = PASS_AND_PLAY_GAMES[args.gameId];
+    if (!gameName) return { error: "Unknown game." };
+    if (args.seatNames.length < 2 || args.seatNames.length > 4) return { error: "Pick 2–4 players." };
+    if (!args.seatNames.every(isValidSeatName)) return { error: "Player names must be 1–20 letters." };
+    const names = args.seatNames.map(n => n.trim());
+    const w = args.winnerSeat;
+    if (w !== undefined && (!Number.isInteger(w) || w < 0 || w > names.length)) return { error: "Invalid result." };
+    if (author.kidMode) {
+      // Guests are free-typed names; kids can only name real family members.
+      const family = new Set((await ctx.db.query("players").collect())
+        .filter(p => p.status === undefined || p.status === "approved")
+        .map(p => p.name.toLowerCase()));
+      if (!names.every(n => family.has(n.toLowerCase()))) {
+        return { error: "Kid mode can only share games between family members." };
+      }
     }
+    const summary = describeMatchNames(names, w, gameName);
     const postId = await ctx.db.insert("feed", {
       authorId: author._id,
       authorName: author.name,

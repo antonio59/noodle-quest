@@ -80,7 +80,8 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
   })
     .index("by_to", ["toId", "status"])
-    .index("by_from", ["fromId"]),
+    .index("by_from", ["fromId"])
+    .index("by_completed", ["completedAt"]),
 
   feed: defineTable({
     authorId: v.id("players"),

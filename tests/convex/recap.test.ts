@@ -44,6 +44,13 @@ describe("recap.getFamilyWeek", () => {
     await t.mutation(api.puzzles.submitPuzzleTime, {
       sessionToken: mia.sessionToken, puzzleKey: weeklyPuzzleKey(Date.now()), seconds: 125,
     });
+    // A challenge finished before the window doesn't appear.
+    await t.run(async ctx => {
+      await ctx.db.insert("challenges", {
+        fromId: mia.playerId, toId: mum.playerId, gameId: "ludo", stage: 1, fromScore: 1, toScore: 99,
+        status: "completed", createdAt: 0, completedAt: Date.now() - RECAP_WINDOW_MS - 60_000,
+      });
+    });
 
     const week = await t.query(api.recap.getFamilyWeek, { sessionToken: mum.sessionToken });
     expect(week).toMatchObject({
