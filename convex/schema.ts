@@ -195,6 +195,36 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_created", ["createdAt"]),
 
+  // Crosswords / word searches the family builds from their own words.
+  family_puzzles: defineTable({
+    title: v.string(),
+    entries: v.array(v.object({ answer: v.string(), clue: v.string() })),
+    createdBy: v.id("players"),
+    creatorName: v.string(),
+    creatorAvatar: v.string(),
+    createdAt: v.number(),
+  }).index("by_created", ["createdAt"]),
+
+  // Best solve time per player per puzzle. puzzleKey is "week:2026-W39"
+  // for the shared weekly puzzle or "family:<family_puzzles id>".
+  puzzle_times: defineTable({
+    puzzleKey: v.string(),
+    playerId: v.id("players"),
+    playerName: v.string(),
+    playerAvatar: v.string(),
+    seconds: v.number(),
+    completedAt: v.number(),
+  })
+    .index("by_puzzle", ["puzzleKey", "seconds"])
+    .index("by_puzzle_player", ["puzzleKey", "playerId"]),
+
+  // Fixed-window counters for paid or abusable endpoints (e.g. AI clues).
+  rate_limits: defineTable({
+    key: v.string(),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index("by_key", ["key"]),
+
   // Admin secret brute-force gate (single row keyed "default")
   admin_gate: defineTable({
     key: v.string(),

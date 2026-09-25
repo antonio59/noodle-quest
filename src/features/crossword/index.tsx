@@ -4,6 +4,7 @@ import { EN_GB_CORE_WORDS, EN_GB_CORE_CLUES } from '@/data/words/en-gb-core';
 import { CrosswordGrid } from './CrosswordGrid';
 import { useCrossword } from './use-crossword';
 import type { GameProps } from '@/types';
+import type { FixedPuzzle } from '@/lib/fixed-puzzles';
 import { RefreshCw, Eye, CheckCircle } from 'lucide-react';
 
 function makePuzzleId() {
@@ -18,16 +19,24 @@ function crosswordCfg(stage: number) {
   };
 }
 
-export default function CrosswordGame({ stage = 1, onScore, onProgress, onEnd }: Partial<GameProps>) {
-  const cfg = crosswordCfg(stage);
-  const [puzzleId, setPuzzleId] = useState(() => makePuzzleId());
-  const [seed, setSeed] = useState(() => Date.now());
+interface CrosswordProps extends Partial<GameProps> {
+  /** Same grid for everyone (weekly / family puzzle): no reshuffle, no reveal. */
+  fixed?: FixedPuzzle;
+}
+
+export default function CrosswordGame({ stage = 1, onScore, onProgress, onEnd, fixed }: CrosswordProps) {
+  const stageCfg = crosswordCfg(stage);
+  const cfg = fixed ? { ...stageCfg, gridSize: fixed.gridSize, maxWords: fixed.maxWords } : stageCfg;
+  const words = fixed?.words ?? EN_GB_CORE_WORDS;
+  const clues = fixed?.clues ?? EN_GB_CORE_CLUES;
+  const [puzzleId, setPuzzleId] = useState(() => fixed?.key ?? makePuzzleId());
+  const [seed, setSeed] = useState(() => fixed?.seed ?? Date.now());
   const startedAtRef = useRef<number>(Date.now());
   const lastFilledRef = useRef<number>(0);
   const endedRef = useRef(false);
 
   const puzzle = useMemo(() => {
-    return generateCrossword(EN_GB_CORE_WORDS, EN_GB_CORE_CLUES, {
+    return generateCrossword(words, clues, {
       gridSize: cfg.gridSize,
       seed,
       maxWords: cfg.maxWords,
@@ -35,7 +44,7 @@ export default function CrosswordGame({ stage = 1, onScore, onProgress, onEnd }:
       targetDifficulty: cfg.targetDifficulty,
       locale: 'en-GB',
     });
-  }, [seed, cfg.gridSize, cfg.maxWords, cfg.targetDifficulty]);
+  }, [words, clues, seed, cfg.gridSize, cfg.maxWords, cfg.targetDifficulty]);
 
   const {
     grid,
@@ -120,21 +129,25 @@ export default function CrosswordGame({ stage = 1, onScore, onProgress, onEnd }:
               <CheckCircle size={13} />
               Check
             </button>
-            <button
-              onClick={() => { if (activeCell) revealCell(activeCell.r, activeCell.c); }}
-              className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-text px-3 py-1.5 rounded-lg text-xs transition"
-              title="Reveal selected cell"
-            >
-              <Eye size={13} />
-              Reveal
-            </button>
-            <button
-              onClick={handleNewGame}
-              className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-text px-2.5 py-1.5 rounded-lg text-xs transition"
-              title="New game"
-            >
-              <RefreshCw size={12} />
-            </button>
+            {!fixed && (
+              <>
+                <button
+                  onClick={() => { if (activeCell) revealCell(activeCell.r, activeCell.c); }}
+                  className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-text px-3 py-1.5 rounded-lg text-xs transition"
+                  title="Reveal selected cell"
+                >
+                  <Eye size={13} />
+                  Reveal
+                </button>
+                <button
+                  onClick={handleNewGame}
+                  className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-text px-2.5 py-1.5 rounded-lg text-xs transition"
+                  title="New game"
+                >
+                  <RefreshCw size={12} />
+                </button>
+              </>
+            )}
           </div>
         </div>
 

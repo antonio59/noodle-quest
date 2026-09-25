@@ -4,6 +4,7 @@ import { EN_GB_CORE_WORDS } from '@/data/words/en-gb-core';
 import { WordSearchGrid } from './WordSearchGrid';
 import { useWordSearch } from './use-wordsearch';
 import type { GameProps } from '@/types';
+import type { FixedPuzzle } from '@/lib/fixed-puzzles';
 import { Check, Sparkles, RefreshCw } from 'lucide-react';
 
 function makePuzzleId() {
@@ -22,24 +23,37 @@ function wordSearchCfg(stage: number) {
   };
 }
 
-export default function WordSearchGame({ stage = 1, onScore, onProgress, onEnd }: Partial<GameProps>) {
-  const cfg = wordSearchCfg(stage);
-  const [puzzleId, setPuzzleId] = useState(() => makePuzzleId());
-  const [seed, setSeed] = useState(() => Date.now());
+// Fixed puzzles are for everyone incl. young kids: no backwards words.
+const FIXED_DIRECTIONS: ('across' | 'down' | 'diagonal')[] = ['across', 'down', 'diagonal'];
+
+interface WordSearchProps extends Partial<GameProps> {
+  /** Same grid for everyone (weekly / family puzzle): no reshuffle. */
+  fixed?: FixedPuzzle;
+}
+
+export default function WordSearchGame({ stage = 1, onScore, onProgress, onEnd, fixed }: WordSearchProps) {
+  const stageCfg = wordSearchCfg(stage);
+  const cfg = fixed
+    ? { gridSize: fixed.gridSize, maxWords: fixed.maxWords, directions: FIXED_DIRECTIONS }
+    : stageCfg;
+  const words = fixed?.words ?? EN_GB_CORE_WORDS;
+  const [puzzleId, setPuzzleId] = useState(() => fixed?.key ?? makePuzzleId());
+  const [seed, setSeed] = useState(() => fixed?.seed ?? Date.now());
   const startedAtRef = useRef<number>(Date.now());
   const lastScoreRef = useRef<number>(0);
   const endedRef = useRef(false);
 
   const puzzle = useMemo(() => {
-    return generateWordSearch(EN_GB_CORE_WORDS, {
+    return generateWordSearch(words, {
       gridSize: cfg.gridSize,
       directions: cfg.directions,
       seed,
       maxWords: cfg.maxWords,
-      allowOverlap: false,
+      // Shared letters let a family's whole word list fit.
+      allowOverlap: !!fixed,
       locale: 'en-GB',
     });
-  }, [seed, cfg.gridSize, cfg.maxWords, cfg.directions]);
+  }, [words, fixed, seed, cfg.gridSize, cfg.maxWords, cfg.directions]);
 
   const {
     found,
@@ -114,13 +128,15 @@ export default function WordSearchGame({ stage = 1, onScore, onProgress, onEnd }
               <span className="text-text-muted font-normal"> / {totalWords} words</span>
             </span>
           </div>
-          <button
-            onClick={handleNewGame}
-            className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-text px-3 py-1.5 rounded-lg text-xs font-semibold transition"
-          >
-            <RefreshCw size={12} />
-            New Game
-          </button>
+          {!fixed && (
+            <button
+              onClick={handleNewGame}
+              className="flex items-center gap-1.5 bg-card hover:bg-card-hover text-text px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+            >
+              <RefreshCw size={12} />
+              New Game
+            </button>
+          )}
         </div>
 
         {/* Progress bar */}
