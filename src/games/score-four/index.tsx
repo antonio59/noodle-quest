@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { GameProps } from '@/types';
+import type { GameProps, GameResult, LocalSeat } from '@/types';
 import { webglSupported } from '@/lib/webgl';
 import { playPlace, playCapture } from '@/lib/feedback';
+import { SEAT_COLORS, seatAt } from '@/lib/pass-and-play';
+import { TurnBanner } from '@/components/pass-and-play/TurnBanner';
 import {
   N, newBoard, drop, landingY, isFull, winningLine, bestRod, idx,
   type Board, type Cell, type Player, type Rod,
@@ -12,6 +14,21 @@ import {
 const P1_COLOR = '#f0a83a'; // you / player 1
 const P2_COLOR = '#f59e0b'; // AI / player 2
 const SPACING = 1.15;
+
+type BeadColors = Readonly<Record<Player, string>>;
+const DEFAULT_BEADS: BeadColors = { 1: P1_COLOR, 2: P2_COLOR };
+// Pass & play: beads wear the turn banner's seat colours so two people on
+// one screen can tell them apart (P1/P2 above are both amber).
+const LOCAL_BEADS: BeadColors = { 1: SEAT_COLORS[0], 2: SEAT_COLORS[1] };
+const LOCAL_PIECE_LABEL: Readonly<Record<Player, string>> = { 1: 'Orange', 2: 'Red' };
+
+/** Pause on the finished board before pass & play hands over to the result screen. */
+const LOCAL_END_DELAY_MS = 1100;
+
+function localResult(seats: readonly LocalSeat[], winnerSeat: number): GameResult {
+  const summary = winnerSeat === 0 ? "It's a draw!" : `${seatAt(seats, winnerSeat).name} wins!`;
+  return { score: 0, stars: 0, summary, winnerSeat };
+}
 
 /** Board coordinate → world position (board centred on origin). */
 function worldPos(x: number, y: number, z: number): [number, number, number] {
@@ -53,7 +70,7 @@ function beadsFromBoard(board: Board, winLine: number[] | null): Bead[] {
 const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-function BeadMesh({ bead }: { bead: Bead }) {
+function BeadMesh({ bead, colors }: { bead: Bead; colors: BeadColors }) {
   const ref = useRef<THREE.Mesh>(null);
   const [tx, ty, tz] = worldPos(bead.x, bead.y, bead.z);
   // Drop-in animation start height; state initializer so it's computed
@@ -72,8 +89,8 @@ function BeadMesh({ bead }: { bead: Bead }) {
     <mesh ref={ref} position={[tx, startY, tz]}>
       <sphereGeometry args={[0.42, 24, 24]} />
       <meshStandardMaterial
-        color={bead.player === 1 ? P1_COLOR : P2_COLOR}
-        emissive={bead.winning ? (bead.player === 1 ? P1_COLOR : P2_COLOR) : '#000000'}
+        color={colors[bead.player]}
+        emissive={bead.winning ? colors[bead.player] : '#000000'}
         emissiveIntensity={bead.winning ? 0.6 : 0}
         roughness={0.35}
         metalness={0.15}
@@ -84,6 +101,7 @@ function BeadMesh({ bead }: { bead: Bead }) {
 
 interface SceneProps {
   beads: Bead[];
+  colors: BeadColors;
   cursor: Rod | null;
   hover: Rod | null;
   onRodClick: (rod: Rod) => void;
@@ -92,7 +110,7 @@ interface SceneProps {
   pitch: number;
 }
 
-function Scene({ beads, cursor, hover, onRodClick, onRodHover, yaw, pitch }: SceneProps) {
+function Scene({ beads, colors, cursor, hover, onRodClick, onRodHover, yaw, pitch }: SceneProps) {
   const rods = useMemo(() => {
     const out: Rod[] = [];
     for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) out.push({ x, z });
@@ -137,7 +155,7 @@ function Scene({ beads, cursor, hover, onRodClick, onRodHover, yaw, pitch }: Sce
         );
       })}
 
-      {beads.map(b => <BeadMesh key={b.key} bead={b} />)}
+      {beads.map(b => <BeadMesh key={b.key} bead={b} colors={colors} />)}
 
       <ambientLight intensity={0.65} />
       <directionalLight position={[6, 10, 4]} intensity={1.1} />
@@ -146,8 +164,11 @@ function Scene({ beads, cursor, hover, onRodClick, onRodHover, yaw, pitch }: Sce
   );
 }
 
-function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove }: GameProps) {
+function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove, localSeats }: GameProps) {
   const isOnline = !!multiplayerState;
+  // Pass & play: two people share this device and take turns; no AI.
+  const isLocal = !multiplayerState && (localSeats?.length ?? 0) >= 2;
+  const seats = localSeats ?? [];
   const myPlayer: Player = isOnline
     ? (multiplayerState.playerNumber === 1 ? 1 : 2)
     : 1;
@@ -158,6 +179,8 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
   const [beads, setBeads] = useState<Bead[]>([]);
   const [turn, setTurn] = useState<Player>(1);
   const [over, setOver] = useState(false);
+  /** Pass & play only: winning seat once the round is over, 0 for a draw. */
+  const [localWinner, setLocalWinner] = useState<number | null>(null);
   const [cursor, setCursor] = useState<Rod | null>(null);
   const [hover, setHover] = useState<Rod | null>(null);
   const [view, setView] = useState({ yaw: 0.6, pitch: 0.12 });
@@ -252,6 +275,31 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
     return y;
   }, []);
 
+  // One round per mount — play.tsx owns the tally and rematch. Not routed
+  // through schedule(), which drops callbacks once endedRef is set.
+  const endLocal = useCallback((winnerSeat: number) => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    setOver(true);
+    setLocalWinner(winnerSeat);
+    const id = setTimeout(() => onEnd(localResult(seats, winnerSeat)), LOCAL_END_DELAY_MS);
+    timeoutsRef.current.push(id);
+  }, [onEnd, seats]);
+
+  // Pass & play: whoever's seat it is drops a bead of their colour.
+  const dropLocal = useCallback((rod: Rod) => {
+    place(rod, turn);
+    const line = winningLine(boardRef.current, turn);
+    if (line) {
+      markWinning(line);
+      endLocal(turn);
+    } else if (isFull(boardRef.current)) {
+      endLocal(0);
+    } else {
+      setTurn(turn === 1 ? 2 : 1);
+    }
+  }, [turn, place, markWinning, endLocal]);
+
   const handleDrop = useCallback((rod: Rod) => {
     if (endedRef.current || over) return;
     if (landingY(boardRef.current, rod.x, rod.z) < 0) return;
@@ -278,6 +326,11 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         endedRef.current = true;
         setOver(true);
       }
+      return;
+    }
+
+    if (isLocal) {
+      dropLocal(rod);
       return;
     }
 
@@ -314,6 +367,7 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
   }, [
     over, turn, difficulty, place, markWinning, finish, onMessage, schedule,
     isOnline, myPlayer, otherPlayer, multiplayerState, onMultiplayerMove,
+    isLocal, dropLocal,
   ]);
 
   // Drag anywhere = orbit; small movements still count as clicks on rods.
@@ -364,10 +418,16 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
     setAnnounce(describeRod(next));
   };
 
-  const isMyTurn = isOnline ? turn === myPlayer : turn === 1;
+  // In pass & play it's always "my" turn: the device is handed to whoever's up.
+  const isMyTurn = isLocal || (isOnline ? turn === myPlayer : turn === 1);
   const oppLabel = isOnline
     ? `${multiplayerState?.opponentAvatar ?? ''} ${multiplayerState?.opponentName ?? 'Opponent'}`.trim()
     : 'AI';
+  const keyHint = 'Arrow keys choose a rod, Enter drops a bead.';
+  const boardStatus = over ? 'Game over.'
+    : isLocal ? `${seatAt(seats, turn).name}'s turn. ${keyHint}`
+    : isMyTurn ? `Your turn. ${keyHint}`
+    : isOnline ? 'Waiting for opponent.' : 'AI is thinking.';
 
   if (!supported) {
     return (
@@ -382,7 +442,8 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
     );
   }
 
-  if (!started) {
+  // The seat picker already served as pass & play's start screen.
+  if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
         <div className="text-6xl" aria-hidden>🏗️</div>
@@ -409,7 +470,17 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
 
   return (
     <div className="h-full flex flex-col">
-      {isOnline ? (
+      {isLocal ? (
+        <div className="flex justify-center py-2 flex-shrink-0">
+          {localWinner !== null ? (
+            <p role="status" className={`text-lg font-bold ${localWinner === 0 ? 'text-warning' : 'text-accent'}`}>
+              {localWinner === 0 ? "It's a draw!" : `🎉 ${localResult(seats, localWinner).summary}`}
+            </p>
+          ) : (
+            <TurnBanner seats={seats} turnSeat={turn} pieceLabel={LOCAL_PIECE_LABEL[turn]} />
+          )}
+        </div>
+      ) : isOnline ? (
         <div className="flex gap-2 justify-center py-2 text-xs items-center flex-wrap flex-shrink-0">
           <span className={`bg-card rounded-lg px-3 py-1.5 font-bold ${isMyTurn ? 'text-accent' : 'text-text-muted'}`}>
             You: {myPlayer === 1 ? '🟣' : '🟠'}
@@ -436,11 +507,7 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         tabIndex={0}
         role="application"
         aria-roledescription="Score Four board"
-        aria-label={`Score Four: 4 by 4 by 4 board. ${beads.length} beads placed. ${
-          over ? 'Game over.'
-          : isMyTurn ? 'Your turn. Arrow keys choose a rod, Enter drops a bead.'
-          : isOnline ? 'Waiting for opponent.' : 'AI is thinking.'
-        }`}
+        aria-label={`Score Four: 4 by 4 by 4 board. ${beads.length} beads placed. ${boardStatus}`}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -450,6 +517,7 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         <Canvas camera={{ position: [7.6, 7.2, 10.6], fov: 40 }} dpr={[1, 2]}>
           <Scene
             beads={beads}
+            colors={isLocal ? LOCAL_BEADS : DEFAULT_BEADS}
             cursor={cursor}
             hover={hover}
             onRodClick={handleDrop}
