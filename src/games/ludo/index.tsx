@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { GameProps } from '@/types';
+import type { GameProps, GameResult } from '@/types';
 import {
   TRACK, RED_STRETCH, BLUE_STRETCH, GREEN_STRETCH, YELLOW_STRETCH,
   SAFE_POSITIONS, RED_ENTRY, BLUE_ENTRY, GREEN_ENTRY, YELLOW_ENTRY,
@@ -94,6 +94,16 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     timeoutsRef.current.push(id);
     return id;
   }, []);
+
+  // The final onEnd must fire even though the game is already marked ended
+  // (that flag is what stops further turns); unmount still cancels it.
+  const scheduleEnd = useCallback((result: GameResult, delay: number) => {
+    const id = setTimeout(() => {
+      timeoutsRef.current = timeoutsRef.current.filter(x => x !== id);
+      onEnd(result);
+    }, delay);
+    timeoutsRef.current.push(id);
+  }, [onEnd]);
 
   useEffect(() => {
     endedRef.current = false;
@@ -264,7 +274,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     if (next[aiSeatIdx].every(p => p >= HOME)) {
       overRef.current = true; setOver(true);
       endedRef.current = true;
-      schedule(() => onEnd({ score: 10, stars: 1, summary: 'AI got all 4 pieces home. Better luck next time!' }), 1500);
+      scheduleEnd({ score: 10, stars: 1, summary: 'AI got all 4 pieces home. Better luck next time!' }, 1500);
       return;
     }
 
@@ -331,11 +341,11 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
         : iWon
           ? 'All 4 pieces home! You win!'
           : 'Opponent got all 4 pieces home.';
-      schedule(() => onEnd({
+      scheduleEnd({
         score: iWon || isHotSeat ? 100 : 10,
         stars: iWon || isHotSeat ? 3 : 1,
         summary,
-      }), 1000);
+      }, 1000);
       return;
     }
 

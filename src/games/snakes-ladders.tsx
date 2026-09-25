@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GameProps } from '@/types';
+import type { GameProps, GameResult } from '@/types';
 import { nextSeat, seatAt } from '@/lib/pass-and-play';
 import {
   NO_SEATS, isLocalTable, localWinResult, withSeatAt,
@@ -93,6 +93,16 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
     timeoutsRef.current.push(id);
     return id;
   }, []);
+
+  // The final onEnd must fire even though the game is already marked ended
+  // (that flag is what stops further turns); unmount still cancels it.
+  const scheduleEnd = useCallback((result: GameResult, delay: number) => {
+    const id = setTimeout(() => {
+      timeoutsRef.current = timeoutsRef.current.filter(x => x !== id);
+      onEnd(result);
+    }, delay);
+    timeoutsRef.current.push(id);
+  }, [onEnd]);
 
   useEffect(() => {
     endedRef.current = false;
@@ -244,14 +254,14 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
     onProgress(1);
     onMessage('You reached 100! You win! 🎉');
     endedRef.current = true;
-    schedule(() => onEnd({ score: 80, stars: 3, summary: 'You reached square 100 first! Great climb!' }), 1000);
+    scheduleEnd({ score: 80, stars: 3, summary: 'You reached square 100 first! Great climb!' }, 1000);
   };
 
   const handleAiWin = () => {
     setGameOver(true);
     onMessage('AI reached 100! You lose this round.');
     endedRef.current = true;
-    schedule(() => onEnd({ score: 10, stars: 1, summary: 'The AI reached square 100 first. Watch out for those snakes!' }), 1000);
+    scheduleEnd({ score: 10, stars: 1, summary: 'The AI reached square 100 first. Watch out for those snakes!' }, 1000);
   };
 
   const aiTurn = () => {

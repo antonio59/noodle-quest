@@ -16,11 +16,13 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
   const oppSeat = isOnline ? (mySeat === 1 ? 2 : 1) : 2;
   const isHost = isOnline && multiplayerState.playerNumber === 1;
 
-  const [playerHand, setPlayerHand] = useState<UnoCard[]>(() => dealInitial().pHand);
-  const [aiHand, setAiHand] = useState<UnoCard[]>(() => dealInitial().aHand);
-  const [deck, setDeck] = useState<UnoCard[]>(() => dealInitial().deck);
-  const [discardPile, setDiscardPile] = useState<UnoCard[]>(() => dealInitial().discard);
-  const [currentColor, setCurrentColor] = useState<UnoColor>(() => dealInitial().color);
+  // One deal for the whole table — separate shuffles could duplicate cards.
+  const [firstDeal] = useState(dealInitial);
+  const [playerHand, setPlayerHand] = useState<UnoCard[]>(firstDeal.pHand);
+  const [aiHand, setAiHand] = useState<UnoCard[]>(firstDeal.aHand);
+  const [deck, setDeck] = useState<UnoCard[]>(firstDeal.deck);
+  const [discardPile, setDiscardPile] = useState<UnoCard[]>(firstDeal.discard);
+  const [currentColor, setCurrentColor] = useState<UnoColor>(firstDeal.color);
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const [phase, setPhase] = useState<GamePhase>('playing');
   const [pendingCard, setPendingCard] = useState<UnoCard | null>(null);
