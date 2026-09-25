@@ -8,6 +8,10 @@ import {
   entryFor, stretchFor, sidesForCount, nextSeat,
   type Side,
 } from './logic';
+import {
+  NO_SEATS, isLocalTable, localWinResult, localSeatLabel, localBoardLabel, LocalTurnBar,
+} from './local';
+import { seatAt } from '@/lib/pass-and-play';
 import { playDice, playMove, playCapture } from '@/lib/feedback';
 
 const C = 26;
@@ -39,19 +43,22 @@ function emptyPieces(n: number): number[][] {
   return Array.from({ length: n }, () => [-1, -1, -1, -1]);
 }
 
-function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, numPlayers, multiplayerState, onMultiplayerMove }: GameProps) {
+function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, numPlayers, multiplayerState, onMultiplayerMove, localSeats }: GameProps) {
   const difficulty = aiDifficulty || 'medium';
   const isOnline = !!multiplayerState;
+  // Pass & play: named people share this device, every seat is human.
+  const isLocal = isLocalTable(localSeats, isOnline);
+  const table = localSeats ?? NO_SEATS;
 
   const playerCount = isOnline
     ? Math.max(2, Math.min(4, multiplayerState?.players?.length || 2))
-    : Math.max(2, Math.min(4, numPlayers ?? 2));
+    : Math.max(2, Math.min(4, isLocal ? table.length : numPlayers ?? 2));
 
   const sides = useMemo(() => sidesForCount(playerCount), [playerCount]);
   const mySeat = isOnline ? multiplayerState.playerNumber : 1;
   const mySide = sides[mySeat - 1] ?? 'red';
-  const isAiGame = !isOnline && playerCount === 2;
-  const isHotSeat = !isOnline && playerCount > 2;
+  const isAiGame = !isOnline && !isLocal && playerCount === 2;
+  const isHotSeat = !isOnline && (isLocal || playerCount > 2);
 
   const [allPieces, setAllPieces] = useState<number[][]>(() => emptyPieces(playerCount));
   const [turnSeat, setTurnSeat]   = useState(1);
@@ -59,7 +66,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
   const [pendingDice, setPendingDice] = useState<number|null>(null);
   const [movable, setMovable]     = useState<number[]>([]);
   const [over, setOver]           = useState(false);
-  const [started, setStarted]     = useState(false);
+  const [started, setStarted]     = useState(isLocal); // pass & play skips the intro
 
   const piecesRef = useRef<number[][]>(emptyPieces(playerCount));
   const turnRef   = useRef(1);
@@ -68,6 +75,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const rosterName = (seat: number): string => {
+    if (isLocal) return seatAt(table, seat).name;
     if (isAiGame && seat === 2) return 'AI';
     if (isOnline) {
       const fromRoster = multiplayerState?.players?.find(p => p.seat === seat)?.name;
@@ -280,7 +288,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     piecesRef.current = next;
     setAllPieces(next.map(p => [...p]));
 
-    const label = SIDE_LABEL[sides[seatIdx]];
+    const label = isLocal ? seatAt(table, actingSeat).name : SIDE_LABEL[sides[seatIdx]];
     if (captured) {
       playCapture();
       onMessage(isHotSeat
@@ -292,7 +300,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     } else {
       playMove();
       const dest = np >= STRETCH_START ? `home stretch ${np - STRETCH_START + 1}/6` : `sq ${np}`;
-      onMessage(`Rolled ${d} → ${dest}`);
+      onMessage(`${isLocal ? `${label} rolled` : 'Rolled'} ${d} → ${dest}`);
     }
 
     const won = next[seatIdx].every(p => p >= HOME);
@@ -300,6 +308,15 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
 
     if (isOnline) {
       dispatchOnline(next, d, actingSeat);
+    }
+
+    if (won && isLocal) {
+      // One round, first seat home wins; play.tsx shows the result. endedRef
+      // is set inside the callback because schedule() skips it once true.
+      overRef.current = true; setOver(true);
+      onMessage(`${label} got all 4 pieces home! 🎉`);
+      schedule(() => { endedRef.current = true; onEnd(localWinResult(table, actingSeat)); }, 1000);
+      return;
     }
 
     if (won) {
@@ -331,7 +348,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
     turnRef.current = nxt;
     setTurnSeat(nxt);
     if (isAiGame && nxt === 2) schedule(doAi, 800);
-  }, [sides, isOnline, isAiGame, isHotSeat, mySeat, playerCount, dispatchOnline, onMessage, onScore, onProgress, onEnd, schedule, doAi]);
+  }, [sides, isOnline, isAiGame, isHotSeat, isLocal, table, mySeat, playerCount, dispatchOnline, onMessage, onScore, onProgress, onEnd, schedule, doAi]);
 
   // ── Roll handler ─────────────────────────────────────────────────────────
   const handleRoll = () => {
@@ -348,7 +365,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
 
     const mv = getMovableIndices(piecesRef.current[acting - 1], d);
     if (mv.length === 0) {
-      onMessage(`Rolled ${d} — no piece can move!`);
+      onMessage(`${isLocal ? `${rosterName(acting)} rolled` : 'Rolled'} ${d} — no piece can move!`);
       const nxt = nextSeat(acting, playerCount);
       turnRef.current = nxt;
       setTurnSeat(nxt);
@@ -653,71 +670,77 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
   return (
     <div className="h-full flex flex-col items-center p-2 gap-1.5">
       {/* Status bar */}
-      <div className="w-full max-w-[400px] flex items-center justify-between gap-2 px-1">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: SIDE_COLOR[mySide] }} />
-          <span className="text-xs font-bold truncate" style={{ color: SIDE_COLOR[mySide] }}>
-            {isHotSeat ? SIDE_LABEL[mySide] : 'You'}
-          </span>
-          <span className="text-[11px] text-text-muted whitespace-nowrap">{myHome}/4 home</span>
+      {isLocal ? (
+        <LocalTurnBar seats={table} turnSeat={turnSeat} sideLabel={SIDE_LABEL[turnSide]} picking={pendingDice !== null} />
+      ) : (
+        <div className="w-full max-w-[400px] flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: SIDE_COLOR[mySide] }} />
+            <span className="text-xs font-bold truncate" style={{ color: SIDE_COLOR[mySide] }}>
+              {isHotSeat ? SIDE_LABEL[mySide] : 'You'}
+            </span>
+            <span className="text-[11px] text-text-muted whitespace-nowrap">{myHome}/4 home</span>
+          </div>
+          <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-all ${
+            pendingDice !== null
+              ? 'bg-yellow-400/20 text-yellow-300 ring-1 ring-yellow-400/40'
+              : canAct
+                ? 'bg-accent/20 text-accent ring-1 ring-accent/40'
+                : 'bg-card text-text-muted'
+          }`}>
+            {pendingDice !== null ? (
+              <><span className="animate-bounce">👆</span> Pick a piece</>
+            ) : canAct ? (
+              <><span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+              </span> {isHotSeat ? `${SIDE_LABEL[turnSide]}` : 'Your turn'}</>
+            ) : (
+              <><span className="animate-pulse">{isOnline || isHotSeat ? '⏳' : '🤖'}</span> {waitingLabel}</>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {playerCount === 2 ? (
+              <>
+                <span className="text-[11px] text-text-muted whitespace-nowrap">
+                  {homeCounts[mySeat === 1 ? 1 : 0]}/4 home
+                </span>
+                <span className="text-xs font-bold" style={{ color: SIDE_COLOR[sides[mySeat === 1 ? 1 : 0]] }}>
+                  {rosterName(mySeat === 1 ? 2 : 1)}
+                </span>
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: SIDE_COLOR[sides[mySeat === 1 ? 1 : 0]] }} />
+              </>
+            ) : (
+              sides.map((side, i) => {
+                const seat = i + 1;
+                if (seat === mySeat && !isHotSeat) return null;
+                return (
+                  <span
+                    key={side}
+                    title={`${rosterName(seat)} ${homeCounts[i]}/4`}
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{
+                      background: SIDE_COLOR[side],
+                      opacity: turnSeat === seat ? 1 : 0.45,
+                      outline: turnSeat === seat ? `2px solid ${SIDE_COLOR[side]}` : undefined,
+                      outlineOffset: 1,
+                    }}
+                  />
+                );
+              })
+            )}
+          </div>
         </div>
-        <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition-all ${
-          pendingDice !== null
-            ? 'bg-yellow-400/20 text-yellow-300 ring-1 ring-yellow-400/40'
-            : canAct
-              ? 'bg-accent/20 text-accent ring-1 ring-accent/40'
-              : 'bg-card text-text-muted'
-        }`}>
-          {pendingDice !== null ? (
-            <><span className="animate-bounce">👆</span> Pick a piece</>
-          ) : canAct ? (
-            <><span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-            </span> {isHotSeat ? `${SIDE_LABEL[turnSide]}` : 'Your turn'}</>
-          ) : (
-            <><span className="animate-pulse">{isOnline || isHotSeat ? '⏳' : '🤖'}</span> {waitingLabel}</>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {playerCount === 2 ? (
-            <>
-              <span className="text-[11px] text-text-muted whitespace-nowrap">
-                {homeCounts[mySeat === 1 ? 1 : 0]}/4 home
-              </span>
-              <span className="text-xs font-bold" style={{ color: SIDE_COLOR[sides[mySeat === 1 ? 1 : 0]] }}>
-                {rosterName(mySeat === 1 ? 2 : 1)}
-              </span>
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: SIDE_COLOR[sides[mySeat === 1 ? 1 : 0]] }} />
-            </>
-          ) : (
-            sides.map((side, i) => {
-              const seat = i + 1;
-              if (seat === mySeat && !isHotSeat) return null;
-              return (
-                <span
-                  key={side}
-                  title={`${rosterName(seat)} ${homeCounts[i]}/4`}
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{
-                    background: SIDE_COLOR[side],
-                    opacity: turnSeat === seat ? 1 : 0.45,
-                    outline: turnSeat === seat ? `2px solid ${SIDE_COLOR[side]}` : undefined,
-                    outlineOffset: 1,
-                  }}
-                />
-              );
-            })
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Board */}
       <div className="flex-shrink-0 w-full flex justify-center">
         <svg viewBox={`0 0 ${W} ${W}`} className="rounded-xl w-full h-auto shadow-2xl"
           style={{ maxWidth: 390, maxHeight: '52vh' }} onClick={handleSvgClick}
           role="img"
-          aria-label={`Ludo board. You have ${myHome} of 4 pieces home. ${canAct ? 'Your turn.' : waitingLabel}`}>
+          aria-label={isLocal
+            ? localBoardLabel(table, turnSeat, SIDE_LABEL[turnSide], homeCounts[turnSeat - 1] ?? 0)
+            : `Ludo board. You have ${myHome} of 4 pieces home. ${canAct ? 'Your turn.' : waitingLabel}`}>
           {renderBoard()}
           {renderTokens()}
         </svg>
@@ -765,12 +788,14 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
       <div className="w-full max-w-[400px] flex flex-col gap-1.5 px-1">
         {sides.map((side, i) => {
           const seat = i + 1;
-          const label = seat === mySeat && !isHotSeat
-            ? 'You'
-            : rosterName(seat).slice(0, 8);
+          const label = isLocal
+            ? localSeatLabel(table, seat)
+            : seat === mySeat && !isHotSeat
+              ? 'You'
+              : rosterName(seat).slice(0, 8);
           return (
             <div key={side} className="flex items-center gap-2 text-xs">
-              <span className="font-bold w-14 text-right truncate" style={{ color: SIDE_COLOR[side] }}>{label}</span>
+              <span className={`font-bold ${isLocal ? 'w-20' : 'w-14'} text-right truncate`} style={{ color: SIDE_COLOR[side] }}>{label}</span>
               <div className="flex-1 h-2 bg-card rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pcts[i]}%`, background: SIDE_COLOR[side] }} />
