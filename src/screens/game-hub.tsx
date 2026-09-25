@@ -5,7 +5,7 @@ import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllGames } from '@/lib/game-registry';
 import { GAME_CATEGORIES, type GameCategory } from '@/types';
-import { Heart, Search, Play, Pause, Wind, Star, Sparkles, Volume2, VolumeX, Moon, Smartphone, Globe } from 'lucide-react';
+import { Heart, Search, Play, Pause, Wind, Star, Sparkles, Volume2, VolumeX, Moon, Smartphone, Globe, Puzzle as PuzzleIcon } from 'lucide-react';
 import { RequestGameModal } from '@/components/RequestGameModal';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { TRACKS } from '@/tracks/track-list';
@@ -365,6 +365,18 @@ export function GameHub() {
 
       {tab === 'board' && (
         <div className="flex-1 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/puzzles')}
+            className="mx-4 mt-4 w-[calc(100%-2rem)] flex items-center gap-3 rounded-2xl border border-success/25 bg-success/8 hover:bg-success/12 px-4 py-3 text-left transition-all active:scale-[0.99]"
+          >
+            <PuzzleIcon size={22} className="text-success flex-shrink-0" aria-hidden />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-bold">Puzzle corner</span>
+              <span className="block text-xs text-text-muted truncate">This week's family puzzle + puzzles made from your own words</span>
+            </span>
+            <span className="text-xs font-bold text-success">Open</span>
+          </button>
           <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {allGames
               .filter(g => g.category === 'board')

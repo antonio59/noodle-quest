@@ -17,6 +17,18 @@ const InvitePage = lazy(() => import('@/screens/invite').then(m => ({ default: m
 const Admin = lazy(() => import('@/screens/admin').then(m => ({ default: m.Admin })));
 const AdminReports = lazy(() => import('@/screens/admin-reports').then(m => ({ default: m.AdminReports })));
 const WhyPlay = lazy(() => import('@/screens/why-play').then(m => ({ default: m.WhyPlay })));
+const PuzzleCorner = lazy(() => import('@/screens/puzzles/index').then(m => ({ default: m.PuzzleCorner })));
+const PuzzleMaker = lazy(() => import('@/screens/puzzles/maker').then(m => ({ default: m.PuzzleMaker })));
+const WeeklyPuzzlePlay = lazy(() => import('@/screens/puzzles/play').then(m => ({ default: m.WeeklyPuzzlePlay })));
+const FamilyPuzzlePlay = lazy(() => import('@/screens/puzzles/play').then(m => ({ default: m.FamilyPuzzlePlay })));
+
+function FullScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGate>
+      <Suspense fallback={<ScreenFallback />}>{children}</Suspense>
+    </AuthGate>
+  );
+}
 
 function ScreenFallback() {
   return (
@@ -115,7 +127,13 @@ export function AppRouter() {
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="chat" element={<Feed />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="puzzles" element={<PuzzleCorner />} />
         </Route>
+
+        {/* Puzzle corner, full-screen */}
+        <Route path="puzzles/new" element={<FullScreen><PuzzleMaker /></FullScreen>} />
+        <Route path="puzzles/week/:week" element={<FullScreen><WeeklyPuzzlePlay /></FullScreen>} />
+        <Route path="puzzles/family/:id/:kind" element={<FullScreen><FamilyPuzzlePlay /></FullScreen>} />
 
         {/* Full-screen game (no navbar) */}
         <Route path="play/:gameId" element={

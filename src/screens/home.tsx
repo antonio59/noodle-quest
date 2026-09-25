@@ -7,6 +7,7 @@ import { Star, Zap, Gamepad2, Sparkles, ChevronRight, ArrowRight, Swords } from 
 import { getGame } from '@/lib/game-registry';
 import { computeBonusTiers, getBonusTier } from '@/lib/bonus-multiplier';
 import { getRankTier, RANK_TIERS } from '@/lib/rank-tiers';
+import { WeeklyPuzzleCard } from '@/components/puzzles/WeeklyPuzzleCard';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -127,6 +128,9 @@ export function Home() {
             </span>
           </button>
         )}
+
+        {/* ── Weekly family puzzle ────────────────────────── */}
+        <WeeklyPuzzleCard />
 
         {/* ── Pending challenges ──────────────────────────── */}
         {pendingChallenges.length > 0 && (
