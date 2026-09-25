@@ -1,13 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GameProps } from '@/types';
+import type { GameProps, GameResult, LocalSeat } from '@/types';
 import {
   ROWS, COLS, initBoard, cloneBoard, dropPiece, getWinLine, isFull, bestMove,
-  type Board,
+  type Board, type Color,
 } from './logic';
 import { playPlace } from '@/lib/feedback';
+import { seatAt } from '@/lib/pass-and-play';
+import { TurnBanner } from '@/components/pass-and-play/TurnBanner';
 
-function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove }: GameProps) {
+/** Pause on the finished board before pass & play hands over to the result screen. */
+const LOCAL_END_DELAY_MS = 900;
+
+/** Pass & play: seat 1 drops red, seat 2 drops yellow. */
+const seatOf = (color: Color): number => (color === 'red' ? 1 : 2);
+const COLOR_LABEL: Record<Color, string> = { red: 'Red', yellow: 'Yellow' };
+
+/** Drop-preview tints (arrow, ghost fill, ghost ring) per disc colour. */
+const GHOST: Record<Color, { arrow: string; fill: string; ring: string }> = {
+  red: { arrow: '#ef4444', fill: 'rgba(239,68,68,0.3)', ring: 'rgba(239,68,68,0.6)' },
+  yellow: { arrow: '#fbbf24', fill: 'rgba(251,191,36,0.3)', ring: 'rgba(251,191,36,0.6)' },
+};
+
+function localResult(seats: readonly LocalSeat[], winnerSeat: number): GameResult {
+  const summary = winnerSeat === 0 ? "It's a draw!" : `${seatAt(seats, winnerSeat).name} wins!`;
+  return { score: 0, stars: 0, summary, winnerSeat };
+}
+
+function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove, localSeats }: GameProps) {
   const isOnline = !!multiplayerState;
+  // Pass & play: two people share this device and take turns; no AI.
+  const isLocal = !multiplayerState && (localSeats?.length ?? 0) >= 2;
+  const seats = localSeats ?? [];
   const myColor: 'red' | 'yellow' = isOnline
     ? (multiplayerState.playerNumber === 1 ? 'red' : 'yellow')
     : 'red';
@@ -15,7 +38,7 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
 
   const [board, setBoard] = useState<Board>(initBoard);
   const [turn, setTurn] = useState<'red' | 'yellow'>('red');
-  const [winner, setWinner] = useState<string | null>(null);
+  const [winner, setWinner] = useState<Color | 'draw' | null>(null);
   const [winLine, setWinLine] = useState<number[][] | null>(null);
   const [started, setStarted] = useState(false);
   const [hoverCol, setHoverCol] = useState<number | null>(null);
@@ -97,6 +120,11 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
       return;
     }
 
+    if (isLocal) {
+      dropLocal(col);
+      return;
+    }
+
     if (turn !== 'red') return;
     const nb = cloneBoard(board);
     const row = dropPiece(nb, col, 'red');
@@ -155,14 +183,52 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
     }, 400);
   };
 
-  const isMyTurn = isOnline ? turn === myColor : turn === 'red';
+  // Pass & play: whoever's seat it is drops a disc of their colour.
+  const dropLocal = (col: number) => {
+    const nb = cloneBoard(board);
+    const row = dropPiece(nb, col, turn);
+    if (row < 0) return;
+    setBoard(nb);
+    playPlace();
+    const wl = getWinLine(nb, row, col, turn);
+    if (wl) {
+      setWinLine(wl);
+      setWinner(turn);
+      endLocal(seatOf(turn));
+    } else if (isFull(nb)) {
+      setWinner('draw');
+      endLocal(0);
+    } else {
+      setTurn(turn === 'red' ? 'yellow' : 'red');
+    }
+  };
+
+  // One round per mount — play.tsx owns the tally and rematch. Not routed
+  // through schedule(), which drops callbacks once endedRef is set.
+  const endLocal = (winnerSeat: number) => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    const id = setTimeout(() => onEnd(localResult(seats, winnerSeat)), LOCAL_END_DELAY_MS);
+    timeoutsRef.current.push(id);
+  };
+
+  // In pass & play it's always "my" turn: the device is handed to whoever's up.
+  const isMyTurn = isLocal || (isOnline ? turn === myColor : turn === 'red');
   const inputDisabled = !!winner || !isMyTurn;
   const myChip = myColor === 'red' ? '🔴' : '🟡';
   const otherChip = otherColor === 'red' ? '🔴' : '🟡';
 
   const isWinCell = (r: number, c: number) => winLine?.some(([wr, wc]) => wr === r && wc === c) ?? false;
+  // Pass & play previews the colour about to drop; solo/online always red.
+  const ghost = GHOST[isLocal ? turn : 'red'];
+  const discLabel = (cell: Color | null): string => {
+    if (!cell) return 'empty';
+    if (isLocal) return `${seatAt(seats, seatOf(cell)).name}'s ${cell} disc`;
+    return cell === 'red' ? 'your disc' : 'opponent disc';
+  };
 
-  if (!started) {
+  // The seat picker already served as pass & play's start screen.
+  if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
         <div className="text-6xl">🔴</div>
@@ -193,7 +259,17 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
 
   return (
     <div className="h-full flex flex-col items-center p-3">
-      {isOnline ? (
+      {isLocal ? (
+        <div className="mb-3">
+          {winner ? (
+            <p role="status" className={`text-lg font-bold ${winner === 'draw' ? 'text-warning' : 'text-accent'}`}>
+              {winner === 'draw' ? "It's a draw!" : `🎉 ${localResult(seats, seatOf(winner)).summary}`}
+            </p>
+          ) : (
+            <TurnBanner seats={seats} turnSeat={seatOf(turn)} pieceLabel={COLOR_LABEL[turn]} />
+          )}
+        </div>
+      ) : isOnline ? (
         <div className="flex gap-2 mb-3 text-xs items-center flex-wrap justify-center">
           <span className={`bg-card rounded-lg px-3 py-1.5 font-bold ${isMyTurn ? 'text-accent' : 'text-text-muted'}`}>
             You: {myChip}
@@ -236,7 +312,7 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
                 aria-label={`Drop disc in column ${c + 1}`}
                 className="h-6 flex items-center justify-center text-sm transition-all disabled:opacity-0"
                 style={{
-                  color: hoverCol === c && !inputDisabled ? '#ef4444' : '#ffffff40',
+                  color: hoverCol === c && !inputDisabled ? ghost.arrow : '#ffffff40',
                   transform: hoverCol === c && !inputDisabled ? 'translateY(-2px)' : 'none',
                 }}
               >
@@ -251,7 +327,7 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
           {board.map((row, r) =>
             row.map((cell, c) => {
               const win = isWinCell(r, c);
-              // Ghost piece: where red would land in hovered column
+              // Ghost piece: where the next disc would land in hovered column
               let ghostRow = -1;
               if (hoverCol === c && !inputDisabled && !board[0][c]) {
                 for (let gr = ROWS - 1; gr >= 0; gr--) {
@@ -266,18 +342,18 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
                   onMouseEnter={() => setHoverCol(c)}
                   onMouseLeave={() => setHoverCol(null)}
                   disabled={inputDisabled}
-                  aria-label={`Column ${c + 1}, row ${r + 1}: ${cell === 'red' ? 'your disc' : cell === 'yellow' ? 'opponent disc' : 'empty'}`}
+                  aria-label={`Column ${c + 1}, row ${r + 1}: ${discLabel(cell)}`}
                   className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all"
                   style={{
                     background: cell === 'red'
                       ? win ? '#ef4444' : '#dc2626'
                       : cell === 'yellow'
                       ? win ? '#fbbf24' : '#d97706'
-                      : isGhost ? 'rgba(239,68,68,0.3)'
+                      : isGhost ? ghost.fill
                       : hoverCol === c && !inputDisabled && !board[0][c] ? '#1e3a5a' : '#0f1d3a',
                     boxShadow: win
                       ? cell === 'red' ? '0 0 12px #ef4444, 0 0 24px #ef444460' : '0 0 12px #fbbf24, 0 0 24px #fbbf2460'
-                      : isGhost ? 'inset 0 0 0 2px rgba(239,68,68,0.6)'
+                      : isGhost ? `inset 0 0 0 2px ${ghost.ring}`
                       : cell
                       ? 'inset 0 -2px 4px rgba(0,0,0,0.3)'
                       : 'inset 0 2px 4px rgba(0,0,0,0.5)',
@@ -290,7 +366,7 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
         </div>
       </div>
 
-      {winner && !isOnline && (
+      {winner && !isOnline && !isLocal && (
         <button
           onClick={() => {
             setBoard(initBoard());

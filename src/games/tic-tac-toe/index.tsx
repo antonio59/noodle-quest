@@ -1,10 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
-import type { GameProps } from '@/types';
+import type { GameProps, GameResult, LocalSeat } from '@/types';
 import { checkWinner, bestMove, type Cell, type Player, type WinLine } from './logic';
 import { playMove } from '@/lib/feedback';
+import { seatAt } from '@/lib/pass-and-play';
+import { TurnBanner } from '@/components/pass-and-play/TurnBanner';
 
-function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove }: GameProps & { aiDifficulty?: 'easy' | 'medium' | 'hard' }) {
+/** Pause on the finished board before pass & play hands over to the result screen. */
+const LOCAL_END_DELAY_MS = 900;
+
+/** Pass & play: seat 1 plays X, seat 2 plays O. */
+const seatOf = (mark: Player): number => (mark === 'X' ? 1 : 2);
+
+function localResult(seats: readonly LocalSeat[], winnerSeat: number): GameResult {
+  const summary = winnerSeat === 0 ? "It's a draw!" : `${seatAt(seats, winnerSeat).name} wins!`;
+  return { score: 0, stars: 0, summary, winnerSeat };
+}
+
+function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove, localSeats }: GameProps & { aiDifficulty?: 'easy' | 'medium' | 'hard' }) {
   const isOnline = !!multiplayerState;
+  // Pass & play: two people share this device and take turns; no AI.
+  const isLocal = !multiplayerState && (localSeats?.length ?? 0) >= 2;
+  const seats = localSeats ?? [];
   // In online play seat 1 plays X, seat 2 plays O; local uses X vs AI.
   const myMark: Player = isOnline ? (multiplayerState.playerNumber === 1 ? 'X' : 'O') : 'X';
   const otherMark: Player = myMark === 'X' ? 'O' : 'X';
@@ -20,10 +36,12 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
   const MAX_LOSSES = 3;
   const endedRef = useRef(false);
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [started, setStarted] = useState(false);
 
   useEffect(() => () => {
     if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+    if (endTimerRef.current) clearTimeout(endTimerRef.current);
   }, []);
 
   const human: Player = 'X';
@@ -79,6 +97,11 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
       return;
     }
 
+    if (isLocal) {
+      playLocal(i);
+      return;
+    }
+
     if (turn !== human) return;
     const next = [...board];
     next[i] = human;
@@ -107,6 +130,29 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         }
       }, 400);
     }
+  };
+
+  // Pass & play: whoever's seat it is taps a cell; marks simply alternate.
+  const playLocal = (i: number) => {
+    const next = [...board];
+    next[i] = turn;
+    setBoard(next);
+    playMove();
+    const { result, line } = checkWinner(next);
+    if (!result) {
+      setTurn(turn === 'X' ? 'O' : 'X');
+      return;
+    }
+    setWinLine(line);
+    setWinner(result);
+    endLocal(result === 'draw' ? 0 : seatOf(result));
+  };
+
+  // One round per mount — play.tsx owns the tally and rematch.
+  const endLocal = (winnerSeat: number) => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+    endTimerRef.current = setTimeout(() => onEnd(localResult(seats, winnerSeat)), LOCAL_END_DELAY_MS);
   };
 
   const handleResult = (result: Cell | 'draw', finalBoard: Cell[]) => {
@@ -150,9 +196,11 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
     onMessage('Your turn! (X)');
   };
 
-  const isMyTurn = isOnline ? turn === myMark : turn === human;
+  // In pass & play it's always "my" turn: the device is handed to whoever's up.
+  const isMyTurn = isLocal || (isOnline ? turn === myMark : turn === human);
   const inputDisabled = !!winner || !isMyTurn;
-  if (!started) {
+  // The seat picker already served as pass & play's start screen.
+  if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
         <div className="text-6xl">⭕</div>
@@ -175,7 +223,17 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-4 gap-1">
-      {isOnline ? (
+      {isLocal ? (
+        <div className="mb-3">
+          {winner ? (
+            <p role="status" className={`text-lg font-bold ${winner === 'draw' ? 'text-warning' : 'text-accent'}`}>
+              {winner === 'draw' ? "It's a draw!" : `🎉 ${localResult(seats, seatOf(winner)).summary}`}
+            </p>
+          ) : (
+            <TurnBanner seats={seats} turnSeat={seatOf(turn)} pieceLabel={turn} />
+          )}
+        </div>
+      ) : isOnline ? (
         <div className="flex gap-3 mb-3 text-sm items-center">
           <span className={`bg-card rounded-lg px-3 py-1.5 font-bold ${isMyTurn ? 'text-accent' : 'text-text-muted'}`}>
             You: {myMark}
@@ -202,8 +260,8 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         </div>
       )}
 
-      {/* Turn indicator */}
-      {!winner && (
+      {/* Turn indicator (pass & play shows the TurnBanner instead) */}
+      {!winner && !isLocal && (
         <div className={`text-xs font-bold mb-1 px-3 py-1 rounded-full transition-all ${
           isMyTurn ? 'bg-accent/20 text-accent' : 'bg-card text-text-muted'
         }`}>
@@ -236,7 +294,7 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         })}
       </div>
 
-      {winner && !isOnline && (
+      {winner && !isOnline && !isLocal && (
         <div className="flex flex-col items-center gap-2">
           <div className={`text-lg font-bold ${winner === human ? 'text-accent' : winner === 'draw' ? 'text-warning' : 'text-danger'}`}>
             {winner === 'draw' ? "It's a draw!" : winner === human ? '🎉 You Win!' : '🤖 AI Wins!'}
