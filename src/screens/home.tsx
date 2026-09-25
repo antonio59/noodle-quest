@@ -8,6 +8,7 @@ import { getGame } from '@/lib/game-registry';
 import { computeBonusTiers, getBonusTier } from '@/lib/bonus-multiplier';
 import { getRankTier, RANK_TIERS } from '@/lib/rank-tiers';
 import { WeeklyPuzzleCard } from '@/components/puzzles/WeeklyPuzzleCard';
+import { FamilyWeekCard } from '@/components/FamilyWeekCard';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -196,6 +197,9 @@ export function Home() {
             <div className="text-[10px] text-text-muted font-medium mt-0.5">Plays</div>
           </div>
         </div>
+
+        {/* ── This week in the family ─────────────────────── */}
+        <FamilyWeekCard />
 
         {/* ── Quick Play ──────────────────────────────────── */}
         <div>
