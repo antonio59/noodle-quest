@@ -12,7 +12,7 @@ import {
 } from './logic';
 
 const P1_COLOR = '#f0a83a'; // you / player 1
-const P2_COLOR = '#f59e0b'; // AI / player 2
+const P2_COLOR = '#e85d4c'; // AI / player 2 — tomato, clearly apart from P1's gold
 const SPACING = 1.15;
 
 type BeadColors = Readonly<Record<Player, string>>;
@@ -456,7 +456,7 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         <div className="text-6xl" aria-hidden>🏗️</div>
         <h2 className="text-2xl font-bold">Score Four</h2>
         <div className="bg-card rounded-xl p-4 max-w-xs w-full space-y-2 text-sm text-text-muted">
-          <div className="flex items-start gap-2"><span>🟣</span><span>Drop beads onto any of the 16 rods — they stack upward</span></div>
+          <div className="flex items-start gap-2"><span>🟡</span><span>Drop beads onto any of the 16 rods — they stack upward</span></div>
           <div className="flex items-start gap-2"><span>📐</span><span>Line up 4 in ANY direction — flat, up a rod, or through space</span></div>
           <div className="flex items-start gap-2"><span>🔄</span><span>Drag to spin the board and spot diagonals · arrow keys + Enter work too</span></div>
         </div>
@@ -490,10 +490,10 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
       ) : isOnline ? (
         <div className="flex gap-2 justify-center py-2 text-xs items-center flex-wrap flex-shrink-0">
           <span className={`bg-card rounded-lg px-3 py-1.5 font-bold ${isMyTurn ? 'text-accent' : 'text-text-muted'}`}>
-            You: {myPlayer === 1 ? '🟣' : '🟠'}
+            You: {myPlayer === 1 ? '🟡' : '🔴'}
           </span>
           <span className="bg-card rounded-lg px-3 py-1.5 font-bold text-text-muted">
-            {oppLabel}: {otherPlayer === 1 ? '🟣' : '🟠'}
+            {oppLabel}: {otherPlayer === 1 ? '🟡' : '🔴'}
           </span>
           <span className={`font-bold ${over ? 'text-text-muted' : isMyTurn ? 'text-success animate-pulse' : 'text-text-muted'}`}>
             {over ? 'Game over' : isMyTurn ? 'Your turn' : 'Waiting...'}
@@ -501,8 +501,8 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
         </div>
       ) : (
         <div className="flex gap-3 justify-center py-2 text-sm flex-shrink-0">
-          <span className="bg-card rounded-lg px-3 py-1.5 font-bold" style={{ color: P1_COLOR }}>You: 🟣</span>
-          <span className="bg-card rounded-lg px-3 py-1.5 font-bold" style={{ color: P2_COLOR }}>AI: 🟠</span>
+          <span className="bg-card rounded-lg px-3 py-1.5 font-bold" style={{ color: P1_COLOR }}>You: 🟡</span>
+          <span className="bg-card rounded-lg px-3 py-1.5 font-bold" style={{ color: P2_COLOR }}>AI: 🔴</span>
           <span className={`bg-card rounded-lg px-3 py-1.5 text-xs font-bold ${turn === 1 && !over ? 'text-accent animate-pulse' : 'text-text-muted'}`}>
             {over ? 'Game over' : turn === 1 ? 'Your turn' : 'AI thinking…'}
           </span>
