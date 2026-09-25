@@ -1,17 +1,23 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Check } from 'lucide-react';
 import type { GameProps } from '@/types';
+import { TurnBanner } from '@/components/pass-and-play/TurnBanner';
 import {
-  TILE_SCORES, SIZE, CENTER, BONUS_MAP,
-  buildTilePool, scorePlacement, validateAndScoreCrossWords,
+  SIZE,
+  buildTilePool, scorePlacement,
   generateAiMoves, pickAiMove, buildScoreBreakdown,
-  getActiveWordSet, setActiveWordSet,
-  type Direction, type ScoreBreakdown,
+  setActiveWordSet,
+  type ScoreBreakdown,
 } from './logic';
 import { ScrabbleBoard } from './Board';
+import { ScrabbleHud } from './Hud';
+import { TileRack } from './Rack';
+import { StartScreen } from './StartScreen';
+import { evaluatePlacement } from './placement';
+import { LocalCurtain, localIntro, localSeatBadge, localSeatName, useLocalTurns } from './local';
 import {
   DICTIONARIES, fetchDictionary, getPreferredDictionary, setPreferredDictionary,
-  isDictVariant, type DictVariant,
+  isDictVariant, type DictStatus, type DictVariant,
 } from './dictionary';
 
 
@@ -24,14 +30,17 @@ function occupancy(board: (string | null)[][]): number {
 function cloneBoard(board: (string | null)[][]): (string | null)[][] {
   return board.map(row => [...row]);
 }
-function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty = 'medium', numPlayers, multiplayerState, onMultiplayerMove }: GameProps) {
+function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty = 'medium', numPlayers, multiplayerState, onMultiplayerMove, localSeats }: GameProps) {
   const isOnline = !!multiplayerState;
   const isHost = isOnline && multiplayerState.playerNumber === 1;
-  const mySeat = isOnline ? (multiplayerState.playerNumber - 1) : 0;
+  // Pass & play: every seat is a person on this device — no AI, and each
+  // rack stays behind a curtain until its owner has the device.
+  const isLocal = !isOnline && (localSeats?.length ?? 0) >= 2;
+  const tableSeats = useMemo(() => (isLocal ? localSeats ?? [] : []), [isLocal, localSeats]);
   // Clamp to 2..4; default 2. In online mode, seats = roster size (min 2).
   const SEATS = isOnline
     ? Math.max(2, Math.min(4, multiplayerState?.players?.length || 2))
-    : Math.max(2, Math.min(4, numPlayers ?? 2));
+    : Math.max(2, Math.min(4, (isLocal ? tableSeats.length : numPlayers) ?? 2));
 
   const [board, setBoard] = useState<(string | null)[][]>(
     () => Array.from({ length: SIZE }, () => Array(SIZE).fill(null))
@@ -55,7 +64,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
   // The game must not be playable against the small embedded fallback —
   // that's how valid words end up rejected.
   const [dictVariant, setDictVariant] = useState<DictVariant>(getPreferredDictionary);
-  const [dictStatus, setDictStatus] = useState<'loading' | 'ready' | 'error' | 'fallback'>('loading');
+  const [dictStatus, setDictStatus] = useState<DictStatus>('loading');
   const endedRef = useRef(false);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Board we just dispatched, held until the server snapshot is at least as
@@ -83,8 +92,13 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
     setDictVariant(v);
   };
 
+  // The seat whose rack this device shows: ours online, seat 0 against the
+  // AI, and whoever's turn it is in pass & play.
+  const mySeat = isOnline ? (multiplayerState.playerNumber - 1) : isLocal ? currentSeat : 0;
+
   // Seat 0 is only "You" offline; online it's whichever seat we occupy.
   const seatLabel = (i: number): string => {
+    if (isLocal) return localSeatName(tableSeats, i);
     if (i === mySeat) return 'You';
     if (isOnline) {
       const other = multiplayerState?.players?.find(p => p.seat === i + 1);
@@ -95,9 +109,10 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
 
   const maxRounds = 6 + stage * 6; // each seat plays maxRounds turns
   const targetScore = stage * 30;
-  const isHumanTurn = currentSeat === (isOnline ? mySeat : 0);
-  const playerRack = racks[isOnline ? mySeat : 0] ?? [];
-  const playerScore = scores[isOnline ? mySeat : 0] ?? 0;
+  // Every turn change re-covers the device, so the key must be unique per turn.
+  const local = useLocalTurns({ enabled: isLocal, seats: tableSeats, turnKey: `${round}:${currentSeat}`, onEnd });
+  const isHumanTurn = currentSeat === mySeat && local.handVisible;
+  const playerRack = racks[mySeat] ?? [];
 
   const schedule = useCallback((fn: () => void, ms: number) => {
     const id = setTimeout(() => {
@@ -124,9 +139,11 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
     setRacks(dealt);
     setPool(fresh);
     onMessage(
-      SEATS > 2
-        ? `Your turn — ${SEATS - 1} AI opponents (target ${targetScore})`
-        : `Your turn — place tiles to make a word (target ${targetScore})`,
+      isLocal
+        ? `${seatLabel(0)} goes first — place tiles to make a word`
+        : SEATS > 2
+          ? `Your turn — ${SEATS - 1} AI opponents (target ${targetScore})`
+          : `Your turn — place tiles to make a word (target ${targetScore})`,
     );
   // intentionally only on mount
 
@@ -214,6 +231,10 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
   const finishGame = useCallback((finalScores: number[]) => {
     if (endedRef.current) return;
     endedRef.current = true;
+    if (isLocal) {
+      local.finish(finalScores);
+      return;
+    }
     const mine = finalScores[0] ?? 0;
     const best = Math.max(...finalScores);
     const winners = finalScores.reduce<number[]>((acc, s, i) => (s === best ? [...acc, i] : acc), []);
@@ -231,7 +252,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
         ? `Tied at ${mine}!`
         : `You scored ${mine} · best was ${best}.`;
     schedule(() => onEnd({ score: mine, stars, summary }), 800);
-  }, [targetScore, onEnd, schedule]);
+  }, [targetScore, onEnd, schedule, isLocal, local.finish]);
 
   const handleRackClick = (idx: number) => {
     if (!isHumanTurn) return;
@@ -271,107 +292,7 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
   };
 
   // Validate the player's current placement and return the main word + score (or invalid)
-  const findPlayerPlay = (): { valid: boolean; word: string; cells: [number, number][]; score: number; reason?: string; breakdown?: ScoreBreakdown } => {
-    const cells = Array.from(placedKeys).map(k => k.split(',').map(Number) as [number, number]);
-    if (cells.length === 0) return { valid: false, word: '', cells: [], score: 0, reason: 'Place at least one tile' };
-
-    const rows = cells.map(c => c[0]);
-    const cols = cells.map(c => c[1]);
-    const sameRow = rows.every(r => r === rows[0]);
-    const sameCol = cols.every(c => c === cols[0]);
-    if (!sameRow && !sameCol) return { valid: false, word: '', cells: [], score: 0, reason: 'Tiles must be in a straight line' };
-
-    let dir: Direction;
-    let wordCells: [number, number][];
-    let word: string;
-
-    if (cells.length === 1) {
-      const [r, c] = cells[0];
-
-      // Horizontal word through this cell
-      let hsc = c;
-      while (hsc > 0 && board[r][hsc - 1]) hsc--;
-      const hCells: [number, number][] = [];
-      let hwc = hsc;
-      while (hwc < SIZE && board[r][hwc]) { hCells.push([r, hwc]); hwc++; }
-
-      // Vertical word through this cell
-      let vsr = r;
-      while (vsr > 0 && board[vsr - 1][c]) vsr--;
-      const vCells: [number, number][] = [];
-      let vwr = vsr;
-      while (vwr < SIZE && board[vwr][c]) { vCells.push([vwr, c]); vwr++; }
-
-      if (hCells.length < 2 && vCells.length < 2) {
-        return { valid: false, word: '', cells: [], score: 0, reason: 'Word must be at least 2 letters' };
-      }
-
-      if (hCells.length >= vCells.length) {
-        dir = 'H';
-        wordCells = hCells;
-      } else {
-        dir = 'V';
-        wordCells = vCells;
-      }
-      word = wordCells.map(([rr, cc]) => board[rr][cc]).join('');
-    } else {
-      dir = sameRow ? 'H' : 'V';
-      const sorted = sameRow
-        ? [...cells].sort((a, b) => a[1] - b[1])
-        : [...cells].sort((a, b) => a[0] - b[0]);
-
-      // Contiguous (allowing existing tiles in between)
-      if (sameRow) {
-        for (let c = sorted[0][1]; c <= sorted[sorted.length - 1][1]; c++) {
-          if (!board[sorted[0][0]][c]) return { valid: false, word: '', cells: [], score: 0, reason: 'Tiles must form one word' };
-        }
-      } else {
-        for (let r = sorted[0][0]; r <= sorted[sorted.length - 1][0]; r++) {
-          if (!board[r][sorted[0][1]]) return { valid: false, word: '', cells: [], score: 0, reason: 'Tiles must form one word' };
-        }
-      }
-
-      // Expand to include existing tiles flanking the placement
-      let sr = sorted[0][0], sc = sorted[0][1];
-      if (sameRow) while (sc > 0 && board[sr][sc - 1]) sc--;
-      else while (sr > 0 && board[sr - 1][sc]) sr--;
-
-      wordCells = [];
-      let wr = sr, wc = sc;
-      if (sameRow) while (wc < SIZE && board[wr][wc]) { wordCells.push([wr, wc]); wc++; }
-      else while (wr < SIZE && board[wr][wc]) { wordCells.push([wr, wc]); wr++; }
-
-      word = wordCells.map(([r, c]) => board[r][c]).join('');
-    }
-    if (word.length < 2) return { valid: false, word: '', cells: [], score: 0, reason: 'Word must be at least 2 letters' };
-    if (!getActiveWordSet().has(word)) return { valid: false, word, cells: wordCells, score: 0, reason: `"${word}" is not in the dictionary` };
-
-    // First move must touch center
-    if (isFirstMove && !wordCells.some(([r, c]) => r === CENTER && c === CENTER)) {
-      return { valid: false, word, cells: wordCells, score: 0, reason: 'First word must cross the center star' };
-    }
-    // Subsequent moves: at least one new tile must be adjacent to a previously-locked tile
-    if (!isFirstMove) {
-      const touches = cells.some(([r, c]) =>
-        (r > 0 && lockedCells.has(`${r - 1},${c}`)) ||
-        (r < SIZE - 1 && lockedCells.has(`${r + 1},${c}`)) ||
-        (c > 0 && lockedCells.has(`${r},${c - 1}`)) ||
-        (c < SIZE - 1 && lockedCells.has(`${r},${c + 1}`))
-      );
-      if (!touches) return { valid: false, word, cells: wordCells, score: 0, reason: 'New tiles must connect to existing words' };
-    }
-
-    // Validate cross-words formed by new tiles
-    const newCellsArr = cells.map(([r, c]) => ({ r, c, letter: board[r][c]! }));
-    const crossBonus = validateAndScoreCrossWords(board, newCellsArr, dir);
-    if (crossBonus < 0) return { valid: false, word, cells: wordCells, score: 0, reason: 'Invalid cross-word formed' };
-
-    const newCellSet = new Set(cells.map(([r, c]) => `${r},${c}`));
-    const mainScore = scorePlacement(board, wordCells, newCellSet);
-    const all7Bonus = cells.length === 7 ? 50 : 0;
-    const breakdown = buildScoreBreakdown(board, wordCells, newCellSet, crossBonus, all7Bonus);
-    return { valid: true, word, cells: wordCells, score: mainScore + crossBonus + all7Bonus, breakdown };
-  };
+  const findPlayerPlay = () => evaluatePlacement(board, placedKeys, lockedCells, isFirstMove);
 
   /** Advance to the next seat. Increments the round counter each time we
    *  wrap back to seat 0. Ends the game once everyone has finished maxRounds. */
@@ -393,13 +314,13 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       setScoreBreakdown(null);
       return;
     }
-    const seat = isOnline ? mySeat : 0;
+    const seat = mySeat;
     const newScores = scores.map((s, i) => (i === seat ? s + result.score : s));
     const committed = cloneBoard(board);
     if (isOnline) pendingOnlineBoardRef.current = committed;
     setScores(newScores);
     onScore(result.score);
-    setLastWord(`You played "${result.word}" for ${result.score}`);
+    setLastWord(`${seatLabel(seat)} played "${result.word}" for ${result.score}`);
     setScoreBreakdown(result.breakdown ?? null);
     onMessage(`+${result.score} for "${result.word}"!`);
 
@@ -445,7 +366,8 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
 
   // AI turn — runs whenever currentSeat points at a non-human seat.
   useEffect(() => {
-    if (isOnline) return; // Online: opponents drive their own turns
+    // Online opponents drive their own turns; in pass & play every seat is a person.
+    if (isOnline || isLocal) return;
     if (isHumanTurn || endedRef.current) return;
     const seat = currentSeat;
     setAiThinking(true);
@@ -546,8 +468,8 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
     setPlacedCells(new Map());
     setSelectedTile(null);
     setScoreBreakdown(null);
-    onMessage('You passed your turn');
-    setLastWord('You passed');
+    onMessage(isLocal ? `${seatLabel(mySeat)} passed` : 'You passed your turn');
+    setLastWord(`${seatLabel(mySeat)} passed`);
     if (isOnline && onMultiplayerMove) {
       const restoredRacks = racks.map((rack, i) => (i === mySeat ? [...rack, ...letters] : rack));
       onMultiplayerMove({
@@ -575,102 +497,19 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
 
   if (!started && !isOnline) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 p-4 overflow-y-auto">
-        <div className="text-5xl">🅰️</div>
-        <h2 className="text-2xl font-bold">Scrabble</h2>
-        <p className="text-text-muted text-sm text-center max-w-xs">
-          Build words on the board using letter tiles. First to reach{' '}
-          <span className="text-accent font-bold">{targetScore} pts</span> wins!
-        </p>
-        <div className="w-full max-w-xs bg-card rounded-2xl p-4 flex flex-col gap-2 ring-1 ring-white/10">
-          <span className="text-xs font-bold text-text-muted uppercase tracking-wide">How to play</span>
-          <div className="flex flex-col gap-1.5 text-xs text-text-muted">
-            <div className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold text-base leading-none mt-0.5">★</span>
-              <span>First word must cross the <span className="text-text font-semibold">center star</span></span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none mt-0.5">🔗</span>
-              <span>Every word after must <span className="text-text font-semibold">connect</span> to an existing tile</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none mt-0.5">🎯</span>
-              <span>Use all 7 tiles in one move for a <span className="text-text font-semibold">+50 Bingo bonus!</span></span>
-            </div>
-          </div>
-          <div className="border-t border-white/10 pt-2 mt-1">
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wide block mb-1.5">Bonus squares</span>
-            <div className="grid grid-cols-2 gap-1 text-[10px]">
-              {[
-                { label: 'TW', color: 'bg-red-700', desc: 'Triple Word' },
-                { label: 'DW', color: 'bg-rose-500', desc: 'Double Word' },
-                { label: 'TL', color: 'bg-blue-600', desc: 'Triple Letter' },
-                { label: 'DL', color: 'bg-sky-500', desc: 'Double Letter' },
-              ].map(b => (
-                <div key={b.label} className="flex items-center gap-1.5">
-                  <span className={`${b.color} text-white font-bold rounded px-1 py-0.5 text-[9px] min-w-[22px] text-center`}>{b.label}</span>
-                  <span className="text-text-muted">{b.desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        {/* Dictionary picker */}
-        <div className="w-full max-w-xs" role="radiogroup" aria-label="Dictionary">
-          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wide block mb-1.5">Dictionary</span>
-          <div className="grid grid-cols-2 gap-2">
-            {(Object.keys(DICTIONARIES) as DictVariant[]).map(v => (
-              <button
-                key={v}
-                onClick={() => chooseDictionary(v)}
-                role="radio"
-                aria-checked={dictVariant === v}
-                title={DICTIONARIES[v].blurb}
-                className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-xl text-xs font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                  dictVariant === v ? 'bg-accent-soft ring-1 ring-accent text-text' : 'bg-card hover:bg-card-hover text-text-muted'
-                }`}
-              >
-                <span className="text-base" aria-hidden>{DICTIONARIES[v].flag}</span>
-                {DICTIONARIES[v].label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {dictStatus === 'error' ? (
-          <div className="w-full max-w-xs bg-danger/10 border border-danger/30 rounded-xl p-3 text-center space-y-2">
-            <p className="text-xs text-text-muted">Couldn't download the dictionary — check your connection.</p>
-            <div className="flex gap-2 justify-center">
-              <button
-                onClick={() => chooseDictionary(dictVariant)}
-                className="bg-accent text-bg font-bold px-4 py-2 rounded-xl text-sm hover:opacity-90 active:scale-95"
-              >
-                Retry
-              </button>
-              <button
-                onClick={() => setDictStatus('fallback')}
-                title="A small built-in word list — many valid words will be rejected"
-                className="bg-card hover:bg-card-hover text-text-muted font-semibold px-4 py-2 rounded-xl text-sm"
-              >
-                Use basic list
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setStarted(true)}
-            disabled={dictStatus === 'loading'}
-            className="bg-accent text-bg font-bold px-8 py-3 rounded-xl text-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-wait"
-          >
-            {dictStatus === 'loading' ? 'Loading dictionary…' : 'Start Game'}
-          </button>
+      <StartScreen
+        intro={isLocal ? localIntro(maxRounds) : (
+          <>
+            Build words on the board using letter tiles. First to reach{' '}
+            <span className="text-accent font-bold">{targetScore} pts</span> wins!
+          </>
         )}
-        {dictStatus === 'fallback' && (
-          <p className="text-[10px] text-warning text-center max-w-xs">
-            Playing with the basic built-in list — some valid words may be rejected.
-          </p>
-        )}
-      </div>
+        dictVariant={dictVariant}
+        dictStatus={dictStatus}
+        onChooseDictionary={chooseDictionary}
+        onUseFallback={() => setDictStatus('fallback')}
+        onStart={() => setStarted(true)}
+      />
     );
   }
 
@@ -698,86 +537,21 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
   }
 
   return (
-    <div className="h-full w-full flex flex-col items-center px-2 pt-1 pb-2 gap-1 overflow-hidden">
+    <div className="relative h-full w-full flex flex-col items-center px-2 pt-1 pb-2 gap-1 overflow-hidden">
       {/* ── Top HUD ── */}
-      <div className="w-full flex-shrink-0 flex flex-col gap-1">
-        {/* Scores row */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {scores.map((s, i) => (
-              <div
-                key={i}
-                className={`flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold ${
-                  i === mySeat
-                    ? 'bg-accent/15 text-accent ring-1 ring-accent/40'
-                    : i === currentSeat
-                      ? 'bg-danger/20 text-danger ring-1 ring-danger/40'
-                      : 'bg-card text-text-muted'
-                }`}
-              >
-                <span className="text-[10px] opacity-70">{seatLabel(i)}</span>
-                <span className="text-sm">{s}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 text-[10px] text-text-muted">
-            <span className="bg-card rounded-md px-1.5 py-0.5">
-              Round <span className="text-text font-bold">{Math.min(round + 1, maxRounds)}</span>/{maxRounds}
-            </span>
-            <span className="bg-card rounded-md px-1.5 py-0.5">
-              Bag: <span className="text-text font-bold">{pool.length}</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Score progress bars — race to targetScore */}
-        <div className="flex flex-col gap-0.5">
-          {scores.map((s, i) => {
-            const pct = Math.min(s / targetScore, 1);
-            return (
-              <div key={i} className="flex items-center gap-1.5">
-                <span className="text-[9px] text-text-muted w-8 text-right shrink-0 truncate">{seatLabel(i)}</span>
-                <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${i === mySeat ? 'bg-accent' : 'bg-red-400'}`}
-                    style={{ width: `${pct * 100}%` }}
-                  />
-                </div>
-                <span className="text-[9px] text-text-muted w-8 shrink-0">{Math.round(pct * 100)}%</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Turn indicator + last move */}
-        <div className="flex items-center justify-between gap-2">
-          <div className={`flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-semibold ${
-            isHumanTurn
-              ? 'bg-accent/20 text-accent'
-              : 'bg-card text-text-muted'
-          }`}>
-            {isHumanTurn ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-                </span>
-                Your turn
-              </>
-            ) : (
-              <>
-                <span className="animate-pulse">🤖</span>
-                AI {currentSeat} is thinking...
-              </>
-            )}
-          </div>
-          {lastWord && (
-            <span className="text-[10px] text-text-muted truncate max-w-[50%]">
-              {lastWord}
-            </span>
-          )}
-        </div>
-      </div>
+      <ScrabbleHud
+        scores={scores}
+        labels={scores.map((_, i) => (isLocal ? localSeatBadge(tableSeats, i) : seatLabel(i)))}
+        mySeat={mySeat}
+        currentSeat={currentSeat}
+        round={round}
+        maxRounds={maxRounds}
+        bagCount={pool.length}
+        targetScore={isLocal ? undefined : targetScore}
+        isHumanTurn={isHumanTurn}
+        turnIndicator={isLocal ? <TurnBanner seats={tableSeats} turnSeat={currentSeat + 1} /> : undefined}
+        lastWord={lastWord}
+      />
 
       {/* ── SVG Board ── */}
       <ScrabbleBoard board={board} placedKeys={placedKeys} isHumanTurn={isHumanTurn} onCellClick={handleBoardClick} />
@@ -866,35 +640,23 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       </div>
 
       {/* ── Tile rack ── */}
-      <div className="flex justify-center gap-1.5 flex-shrink-0 pt-1">
-        {playerRack.map((tile, i) => {
-          const pts = TILE_SCORES[tile];
-          return (
-            <button
-              key={`${tile}-${i}`}
-              onClick={() => handleRackClick(i)}
-              disabled={!isHumanTurn}
-              aria-label={`Tile ${tile}, ${pts} point${pts === 1 ? '' : 's'}`}
-              aria-pressed={selectedTile === i}
-              className={`relative w-10 h-11 rounded-lg font-bold text-base flex flex-col items-center justify-center transition-all shadow-sm ${
-                selectedTile === i
-                  ? 'bg-accent text-bg ring-2 ring-accent scale-110 -translate-y-1 shadow-lg'
-                  : 'bg-amber-200 text-amber-900 hover:bg-amber-300 hover:scale-105 hover:-translate-y-0.5 active:scale-95'
-              } ${!isHumanTurn ? 'opacity-60' : ''}`}
-            >
-              <span className="leading-none">{tile}</span>
-              <span className={`text-[9px] leading-none mt-0.5 font-bold ${
-                selectedTile === i ? 'text-bg/80' : 'text-amber-700'
-              }`}>
-                {pts}
-              </span>
-            </button>
-          );
-        })}
-        {playerRack.length === 0 && (
-          <span className="text-text-muted text-[10px] py-2">No tiles</span>
-        )}
-      </div>
+      <TileRack
+        tiles={playerRack}
+        selected={selectedTile}
+        disabled={!isHumanTurn}
+        hidden={!local.handVisible}
+        onSelect={handleRackClick}
+      />
+
+      {local.showCurtain && (
+        <LocalCurtain
+          seats={tableSeats}
+          seat={currentSeat}
+          lastMove={lastWord}
+          scores={scores}
+          onReady={() => { setSelectedTile(null); local.reveal(); }}
+        />
+      )}
     </div>
   );
 }

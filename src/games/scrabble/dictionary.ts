@@ -7,6 +7,9 @@
 
 export type DictVariant = 'intl' | 'na';
 
+/** Download state of the active lexicon; 'fallback' = the small built-in list. */
+export type DictStatus = 'loading' | 'ready' | 'error' | 'fallback';
+
 export interface DictionaryInfo {
   label: string;
   short: string;
