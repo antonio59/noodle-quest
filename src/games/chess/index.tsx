@@ -4,6 +4,7 @@ import type { GameProps } from '@/types';
 import { bestMove } from './logic';
 import { playMove, playCapture } from '@/lib/feedback';
 import { useBoardCursor } from '@/hooks/useBoardCursor';
+import { COLOR_LABEL, LocalTurnHeader, localResult, seatTag, turnLabel } from './pass-and-play';
 
 const PIECE_UNICODE: Record<string, string> = {
   wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
@@ -30,8 +31,10 @@ const PROMOTION_PIECES: { type: 'q' | 'r' | 'b' | 'n'; label: string }[] = [
   { type: 'n', label: 'Knight' },
 ];
 
-function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove }: GameProps) {
+function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove, localSeats }: GameProps) {
   const isOnline = !!multiplayerState;
+  // Pass & play: both colours are people on this device — no AI at all.
+  const isLocal = !isOnline && (localSeats?.length ?? 0) >= 2;
   const myColor: 'w' | 'b' = isOnline ? (multiplayerState.playerNumber === 1 ? 'w' : 'b') : 'w';
   const otherColor: 'w' | 'b' = myColor === 'w' ? 'b' : 'w';
 
@@ -175,8 +178,17 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
     onMessage(game.isCheck() ? 'Check! Your turn' : 'Your turn!');
   }, [game, difficulty, onMessage, handleGameOver]);
 
+  // Pass & play: end the round once the game is over (mate or any draw).
+  const finishLocalMove = useCallback(() => {
+    const result = localResult(game, localSeats ?? []);
+    if (!result || endedRef.current) return;
+    endedRef.current = true;
+    setGameOver(true);
+    onEnd(result);
+  }, [game, localSeats, onEnd]);
+
   const completeMove = useCallback((from: Square, to: Square, promotion?: 'q' | 'r' | 'b' | 'n') => {
-    const activeColor = isOnline ? myColor : 'w';
+    const activeColor = isOnline ? myColor : isLocal ? game.turn() : 'w';
     const move = game.move({ from, to, promotion: promotion || 'q' });
     if (!move) return false;
     if (move.captured) playCapture(); else playMove();
@@ -191,6 +203,10 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
     setLegalMoves([]);
     setTurn(game.turn());
     setPendingPromotion(null);
+    if (isLocal) {
+      finishLocalMove();
+      return true;
+    }
     onScore(5);
 
     if (isOnline) {
@@ -214,11 +230,12 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
     onMessage('AI thinking...');
     schedule(doAiMove, 600);
     return true;
-  }, [game, onScore, onMessage, handleGameOver, doAiMove, schedule, isOnline, myColor, multiplayerState, onMultiplayerMove]);
+  }, [game, onScore, onMessage, handleGameOver, doAiMove, schedule, isOnline, isLocal, myColor, multiplayerState, onMultiplayerMove, finishLocalMove]);
 
   const handleSquareClick = useCallback((sq: Square) => {
     if (gameOver || endedRef.current) return;
-    const activeColor = isOnline ? myColor : 'w';
+    // Pass & play: whoever's turn it is moves, so either colour can be picked.
+    const activeColor = isOnline ? myColor : isLocal ? turn : 'w';
     if (turn !== activeColor) return;
 
     if (selected) {
@@ -247,19 +264,19 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
       setSelected(null);
       setLegalMoves([]);
     }
-  }, [gameOver, turn, selected, game, isOnline, myColor, completeMove]);
+  }, [gameOver, turn, selected, game, isOnline, isLocal, myColor, completeMove]);
 
   const describeChessSquare = useCallback((r: number, c: number): string => {
     const sqName = `${'abcdefgh'[c]}${'87654321'[r]}` as Square;
     const cell = game.board()[r][c];
     const names: Record<string, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
     const what = cell
-      ? `${cell.color === (isOnline ? myColor : 'w') ? 'your' : 'opponent'} ${names[cell.type]}`
+      ? `${isLocal ? COLOR_LABEL[cell.color].toLowerCase() : cell.color === (isOnline ? myColor : 'w') ? 'your' : 'opponent'} ${names[cell.type]}`
       : 'empty';
     const isSel = selected === sqName;
     const isLegal = legalMoves.includes(sqName);
     return `${sqName}: ${what}${isSel ? ', selected' : ''}${isLegal ? ', legal move' : ''}`;
-  }, [game, selected, legalMoves, isOnline, myColor]);
+  }, [game, selected, legalMoves, isOnline, isLocal, myColor]);
 
   const boardCursor = useBoardCursor({
     rows: 8,
@@ -275,9 +292,14 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
   const svgSize = boardSize + 2 * FRAME;
   const files = 'abcdefgh'.split('');
   const ranks = '87654321'.split('');
-  const activeColor = isOnline ? myColor : 'w';
+  const activeColor = isOnline ? myColor : isLocal ? turn : 'w';
   const isMyTurn = turn === activeColor;
   const isInCheck = game.isCheck();
+  // Promotion picker shows the promoting side's pieces.
+  const promotionColor = isLocal ? turn : myColor;
+  const boardLabel = isLocal
+    ? `Chess board. ${moveHistory.length} moves played. ${turnLabel(localSeats ?? [], turn)}. Use arrow keys to move around the board, Enter to select and move.`
+    : `Chess board. ${moveHistory.length} moves played. ${turn === (isOnline ? myColor : 'w') ? 'Your turn. Use arrow keys to move around the board, Enter to select and move.' : 'Opponent is thinking.'}`;
 
   // Find king positions for check highlight
   const kingSquares: Record<string, Square | null> = { w: null, b: null };
@@ -290,7 +312,8 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
   const matB = captured.b.reduce((s, p) => s + (PIECE_VALUES[p] || 0), 0);
   const matAdv = matW - matB;
 
-  if (!started) {
+  // Pass & play skips the intro — the seat picker already set the table.
+  if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
         <div className="text-6xl">♔</div>
@@ -314,6 +337,7 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
     <div className="h-full flex flex-col lg:flex-row gap-3 p-2 overflow-hidden">
       {/* Board area */}
       <div className="flex-1 flex flex-col items-center min-w-0 overflow-auto">
+        {isLocal && <LocalTurnHeader seats={localSeats ?? []} turn={turn} inCheck={isInCheck} />}
         {isOnline ? (
           <div className="flex gap-2 mb-2 text-xs items-center flex-wrap justify-center">
             <span className={`bg-card rounded-lg px-3 py-1.5 font-bold ${isMyTurn ? 'text-accent' : 'text-text-muted'}`}>
@@ -328,35 +352,39 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
           </div>
         ) : (
           <div className="w-full flex items-center justify-between gap-2 mb-1 px-1">
-            {/* AI row */}
+            {/* AI row (Black's seat in pass & play) */}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-text-muted font-semibold bg-card px-2 py-0.5 rounded-md">AI ♟</span>
+              <span className="text-[10px] text-text-muted font-semibold bg-card px-2 py-0.5 rounded-md">
+                {isLocal ? `${seatTag(localSeats ?? [], 'b')} ♟` : 'AI ♟'}
+              </span>
               <span className="text-xs tracking-tight text-text-muted">
                 {captured.b.map(p => PIECE_UNICODE['b' + p] || p).join('') || '—'}
               </span>
             </div>
-            {/* Turn/check indicator */}
-            <div className={`flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-semibold ${
-              game.isCheck() && turn === 'w'
-                ? 'bg-red-900/40 text-red-400 ring-1 ring-red-500/40'
-                : isMyTurn
-                  ? 'bg-accent/20 text-accent'
-                  : 'bg-card text-text-muted'
-            }`}>
-              {game.isCheck() && turn === 'w' ? (
-                <><span className="animate-pulse">⚠️</span> Check!</>
-              ) : isMyTurn ? (
-                <>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
-                  </span>
-                  Your turn
-                </>
-              ) : (
-                <><span className="animate-pulse">🤖</span> Thinking…</>
-              )}
-            </div>
+            {/* Turn/check indicator (pass & play shows it above the board) */}
+            {!isLocal && (
+              <div className={`flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-semibold ${
+                game.isCheck() && turn === 'w'
+                  ? 'bg-red-900/40 text-red-400 ring-1 ring-red-500/40'
+                  : isMyTurn
+                    ? 'bg-accent/20 text-accent'
+                    : 'bg-card text-text-muted'
+              }`}>
+                {game.isCheck() && turn === 'w' ? (
+                  <><span className="animate-pulse">⚠️</span> Check!</>
+                ) : isMyTurn ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+                    </span>
+                    Your turn
+                  </>
+                ) : (
+                  <><span className="animate-pulse">🤖</span> Thinking…</>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -366,7 +394,7 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
           className="rounded-xl overflow-hidden shadow-2xl flex-shrink-0"
           role="application"
           aria-roledescription="chess board"
-          aria-label={`Chess board. ${moveHistory.length} moves played. ${turn === (isOnline ? myColor : 'w') ? 'Your turn. Use arrow keys to move around the board, Enter to select and move.' : 'Opponent is thinking.'}`}
+          aria-label={boardLabel}
           tabIndex={0}
           onKeyDown={boardCursor.onKeyDown}
           onFocus={boardCursor.onFocus}
@@ -479,9 +507,11 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
         <span className="sr-only" role="status" aria-live="polite">{boardCursor.announce}</span>
 
         <div className="mt-1 w-full flex items-center justify-between gap-2 px-1">
-          {/* You row */}
+          {/* You row (White's seat in pass & play) */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-accent font-semibold bg-accent/10 px-2 py-0.5 rounded-md ring-1 ring-accent/30">You ♙</span>
+            <span className="text-[10px] text-accent font-semibold bg-accent/10 px-2 py-0.5 rounded-md ring-1 ring-accent/30">
+              {isLocal ? `${seatTag(localSeats ?? [], 'w')} ♙` : 'You ♙'}
+            </span>
             <span className="text-xs tracking-tight text-text-muted">
               {captured.w.map(p => PIECE_UNICODE['b' + p] || p).join('') || '—'}
             </span>
@@ -536,7 +566,7 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
             <p className="text-text-muted text-sm mb-4">Choose a piece to promote to:</p>
             <div className="grid grid-cols-2 gap-3">
               {PROMOTION_PIECES.map(({ type, label }) => {
-                const pk = `${myColor}${type}`;
+                const pk = `${promotionColor}${type}`;
                 return (
                   <button
                     key={type}

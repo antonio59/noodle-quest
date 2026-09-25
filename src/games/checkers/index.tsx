@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameProps } from '@/types';
 import {
   SIZE, initBoard, getJumps, allMoves, pieceTargets, applyMove,
-  countPieces, bestMove,
-  type Board, type Pos,
+  countPieces, bestMove, otherColor as opponentOf,
+  type Board, type Color, type Pos,
 } from './logic';
 import { playMove, playCapture } from '@/lib/feedback';
 import { useBoardCursor } from '@/hooks/useBoardCursor';
+import { LocalScoreboard, localResult, turnLabel } from './pass-and-play';
 
 function CheckersGame({
   stage,
@@ -17,8 +18,11 @@ function CheckersGame({
   aiDifficulty,
   multiplayerState,
   onMultiplayerMove,
+  localSeats,
 }: GameProps) {
   const isOnline = !!multiplayerState;
+  // Pass & play: both colours are people on this device — no AI at all.
+  const isLocal = !isOnline && (localSeats?.length ?? 0) >= 2;
   const myColor: 'red' | 'black' = isOnline
     ? (multiplayerState.playerNumber === 1 ? 'red' : 'black')
     : 'red';
@@ -169,9 +173,23 @@ function CheckersGame({
     onMultiplayerMove?.({ boardState: { board: nb }, winner: serverWinner });
   }, [isOnline, myColor, otherColor, multiplayerState, onMultiplayerMove]);
 
+  // Pass & play end-of-turn: end the round or hand the board to the other seat.
+  const finishLocalTurn = useCallback((nb: Board, mover: Color) => {
+    const result = localResult(nb, mover, localSeats ?? []);
+    if (!result) {
+      setTurn(opponentOf(mover));
+      return;
+    }
+    if (endedRef.current) return;
+    endedRef.current = true;
+    onEnd(result);
+  }, [localSeats, onEnd]);
+
   const handleClick = useCallback(
     (r: number, c: number) => {
-      const activeColor: 'red' | 'black' = isOnline ? myColor : 'red';
+      if (isLocal && endedRef.current) return;
+      // Pass & play: whoever's turn it is moves, so any colour can be picked.
+      const activeColor: 'red' | 'black' = isOnline ? myColor : isLocal ? turn : 'red';
       if (turn !== activeColor) return;
       const p = board[r][c];
 
@@ -193,6 +211,8 @@ function CheckersGame({
             if (isOnline) {
               setTurn(otherColor);
               finishOnlineTurn(nb);
+            } else if (isLocal) {
+              finishLocalTurn(nb, activeColor);
             } else if (!handleEnd(nb)) {
               setTurn('black');
               doAiTurn(nb);
@@ -229,25 +249,27 @@ function CheckersGame({
         if (isOnline) {
           setTurn(otherColor);
           finishOnlineTurn(nb);
+        } else if (isLocal) {
+          finishLocalTurn(nb, activeColor);
         } else if (!handleEnd(nb)) {
           setTurn('black');
           doAiTurn(nb);
         }
       }
     },
-    [board, selected, targets, turn, multiJumpPos, onMessage, handleEnd, doAiTurn, isOnline, myColor, otherColor, finishOnlineTurn],
+    [board, selected, targets, turn, multiJumpPos, onMessage, handleEnd, doAiTurn, isOnline, isLocal, myColor, otherColor, finishOnlineTurn, finishLocalTurn],
   );
 
   const describeSquare = useCallback((r: number, c: number): string => {
     const square = `${String.fromCharCode(97 + c)}${SIZE - r}`;
     const p = board[r][c];
     const what = p
-      ? `${p.color === (isOnline ? myColor : 'red') ? 'your' : 'opponent'} ${p.king ? 'king' : 'piece'}`
+      ? `${isLocal ? p.color : p.color === (isOnline ? myColor : 'red') ? 'your' : 'opponent'} ${p.king ? 'king' : 'piece'}`
       : 'empty';
     const isSel = selected?.[0] === r && selected?.[1] === c;
     const isTarget = targets.some(([tr, tc]) => tr === r && tc === c);
     return `${square}: ${what}${isSel ? ', selected' : ''}${isTarget ? ', available move' : ''}`;
-  }, [board, selected, targets, isOnline, myColor]);
+  }, [board, selected, targets, isOnline, isLocal, myColor]);
 
   const boardCursor = useBoardCursor({
     rows: SIZE,
@@ -262,9 +284,22 @@ function CheckersGame({
   const blackCount = countPieces(board, 'black');
   const redCaptured = 12 - blackCount; // started with 12
   const blackCaptured = 12 - redCount;
-  const activeColor: 'red' | 'black' = isOnline ? myColor : 'red';
+  const activeColor: 'red' | 'black' = isOnline ? myColor : isLocal ? turn : 'red';
   const isMyTurn = turn === activeColor;
-  if (!started) {
+  const boardLabel = isLocal
+    ? `Checkers board. Red has ${redCount} pieces, Black has ${blackCount}. ${turnLabel(localSeats ?? [], turn)}. Use arrow keys to move around the board, Enter to select and move.`
+    : `Checkers board. You have ${redCount} pieces, opponent has ${blackCount}. ${isMyTurn ? 'Your turn. Use arrow keys to move around the board, Enter to select and move.' : 'Opponent is moving.'}`;
+  const hint = isLocal
+    ? (multiJumpPos ? 'Keep jumping!' : 'Tap a piece, then tap a square')
+    : isMyTurn
+      ? multiJumpPos
+        ? 'Continue your jump!'
+        : 'Your turn — tap a piece then tap a square'
+      : isOnline
+        ? 'Opponent is moving...'
+        : 'AI is thinking...';
+  // Pass & play skips the intro — the seat picker already set the table.
+  if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
         <div className="text-6xl">♟</div>
@@ -299,6 +334,8 @@ function CheckersGame({
             {isMyTurn ? 'Your turn' : 'Waiting...'}
           </span>
         </div>
+      ) : isLocal ? (
+        <LocalScoreboard seats={localSeats ?? []} turn={turn} counts={{ red: redCount, black: blackCount }} />
       ) : (
         <div className="flex gap-3 mb-2 text-sm items-center flex-wrap justify-center">
           <div className="bg-card rounded-lg px-3 py-1.5 flex items-center gap-2">
@@ -322,7 +359,7 @@ function CheckersGame({
         className="rounded-lg overflow-hidden shadow-lg"
         role="application"
         aria-roledescription="checkers board"
-        aria-label={`Checkers board. You have ${redCount} pieces, opponent has ${blackCount}. ${isMyTurn ? 'Your turn. Use arrow keys to move around the board, Enter to select and move.' : 'Opponent is moving.'}`}
+        aria-label={boardLabel}
         tabIndex={0}
         onKeyDown={boardCursor.onKeyDown}
         onFocus={boardCursor.onFocus}
@@ -449,15 +486,7 @@ function CheckersGame({
 
       <span className="sr-only" role="status" aria-live="polite">{boardCursor.announce}</span>
 
-      <div className="mt-2 text-xs text-text-muted text-center">
-        {isMyTurn
-          ? multiJumpPos
-            ? 'Continue your jump!'
-            : 'Your turn — tap a piece then tap a square'
-          : isOnline
-            ? 'Opponent is moving...'
-            : 'AI is thinking...'}
-      </div>
+      <div className="mt-2 text-xs text-text-muted text-center">{hint}</div>
     </div>
   );
 }
