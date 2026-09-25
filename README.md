@@ -4,20 +4,35 @@ Brain games and board games for the whole family. Train your focus, memory, and 
 
 ## Features
 
-### 53 Games (8 categories)
+### 56 Games (8 categories)
 
 | Category | Games |
 |----------|-------|
 | Memory (9) | Anagram Blast, Copy Cat, Dual N-Back, Fill in the Blank, Flag Match, Map Quiz, Memory Match, Number Ninja, Sudoku |
 | Focus (10) | Attention Archery, Breath Bubbles, Color Rush, Echo Tap, Focus Frenzy, Go / No-Go, Grounding Garden, Mirror Match, Patience Pop, Quick Math |
 | Flexibility (7) | Cube Twist (3D), Flexibility Frames, Just Right, Mistake Master, Squish Lab, Stroop Challenge, Tetris |
-| Motor (3) | Pattern Painter, Pixel Paint, Steady Hands |
+| Motor (4) | Mole Mash, Pattern Painter, Pixel Paint, Steady Hands |
 | Social (3) | Emotion Volcano, Empathy Engine, Feelings Faces |
 | Sequence (2) | Routine Roadmap, Story Builder |
-| Board (15) | 2048, Bingo, Bookworm, Checkers, Chess, Connect Four, Connect Lines, Crossword, Ludo, Scrabble, Score Four (3D), Snakes & Ladders, Tic-Tac-Toe, UNO, Word Search |
+| Board (17) | 2048, Bingo, Bookworm, Checkers, Chess, Connect Four, Connect Lines, Crossword, Ludo, Minesweeper, Scrabble, Score Four (3D), Snakes & Ladders, Tic-Tac-Toe, UNO, Word Guess, Word Search |
 | Breathe (4) | 4-7-8 Calm, Box Breathing, Coherent Breathing, Triangle Breathing |
 
 Board games play against an AI with real search (minimax + alpha-beta) and stage-based difficulty — replaying an early stage is always a gentle match. Two games are fully 3D (three.js): **Cube Twist**, a twisty cube with swipe-to-turn, and **Score Four**, Connect Four in 3D with 76 winning lines. Scrabble validates against your choice of two real lexica — UK & International (SOWPODS) or US & Canada (TWL) — downloaded at runtime; online games use the host's choice so everyone plays by the same words.
+
+Every game has an illustrated tile (flat SVG, tinted by category) generated from `scripts/game-art` with `pnpm art:build`.
+
+### Pass & Play
+
+Nine board games — Checkers, Chess, Connect Four, Ludo, Scrabble, Score Four, Snakes & Ladders, Tic-Tac-Toe and UNO — can be played by 2–4 people sharing one device. Pick seats from the family (or add a guest), take turns, and keep a running tally across rematches (first move rotates each rematch). Card and tile games cover the screen between turns ("Pass to Mia") so nobody sees anyone else's hand. Results are opt-in posts to the family feed; nothing counts toward stars or rankings.
+
+### Puzzle Corner
+
+- **This week's family puzzle** — one crossword or word search (alternating weeks) with the same grid for everyone, a family times board, and a fresh puzzle every Monday (UTC). No streaks.
+- **Family-made puzzles** — type 4–15 of your own words (holidays, pets, spelling lists) and play them as a crossword or word search. "Write clues for me" asks Claude (`claude-opus-5`, structured output, server-side fallback) for kid-friendly clues you can edit; without `ANTHROPIC_API_KEY` families write clues by hand.
+
+### Weekly Family Recap
+
+A rolling 7-day card on Home (games played, stars, star of the week, most-played game, challenge results) and a Sunday 17:00 UTC email of the same summary to `ADMIN_EMAIL`.
 
 ### Real-Time Multiplayer
 
@@ -40,7 +55,8 @@ Lo-fi beats, focus pads, nature sounds, and meditation tones — all synthesized
 - Activity feed with score announcements
 - Real-time chat with @mention support
 - Emoji reactions and reply-to-message quoting
-- Sticker/GIF support
+- GIF search (GIPHY, proxied through Convex, G-rated only)
+- Kid mode: activity feed only — enforced on the server, not just hidden in the UI
 - Player-to-player challenges
 
 ### Accounts & Security
@@ -108,6 +124,8 @@ pnpm run dev
 | `LINEAR_API_KEY` | Convex | Creates Linear issues from error reports (optional) |
 | `LINEAR_WEBHOOK_SECRET` | Convex | Required for `/webhook/linear` (fail-closed if unset) |
 | `GIPHY_API_KEY` | Convex | Chat GIF search, proxied server-side (G-rated only). Picker says "not switched on" if unset |
+| `ANTHROPIC_API_KEY` | Convex | "Write clues for me" in the puzzle maker (20 requests/player/hour). Optional — clues can be written by hand |
+| `RESEND_API_KEY`, `ADMIN_EMAIL` | Convex | Signup-approval emails and the Sunday family recap email. Optional — skipped if unset |
 
 ### Scripts
 
@@ -121,6 +139,8 @@ pnpm test                # Vitest (UI + Convex backend tests)
 pnpm run test:coverage   # Tests with V8 coverage report
 pnpm run convex:dev      # Start Convex dev
 pnpm run convex:deploy   # Deploy Convex functions to production
+pnpm run art:build       # Regenerate public/art/*.svg game tiles
+pnpm run og:build        # Regenerate public/og.jpg link preview (macOS: uses QuickLook)
 ```
 
 ## Database Schema (Convex)
@@ -140,22 +160,25 @@ pnpm run convex:deploy   # Deploy Convex functions to production
 | `multiplayer_sessions` | Live game state (roster, board, turns) |
 | `game_requests` | Player-submitted game ideas |
 | `reports` | Error/issue reports (with optional Linear linkage) |
+| `family_puzzles` | Crosswords / word searches built from the family's own words |
+| `puzzle_times` | Best solve time per player per puzzle (weekly or family-made) |
+| `rate_limits` | Fixed-window counters for paid endpoints (AI clues) |
 
 ## Project Structure
 
 ```
 src/
-  screens/       # Main views (home, game-hub, play, feed, leaderboard, profile, auth, admin, invite, why-play)
-  games/         # 53 game components; board/word games split into tested logic + UI
-  components/    # Shared UI (NavBar, error boundary, report/request modals)
+  screens/       # Main views (home, game-hub, play, feed, leaderboard, profile, auth, admin, invite, why-play, puzzles/)
+  games/         # 56 game components; board/word games split into tested logic + UI
+  components/    # Shared UI (NavBar, GameArt, pass-and-play/, puzzles/, family week card, modals)
   hooks/         # useAudioEngine (Web Audio API), usePageVisibility
   contexts/      # AuthContext (login/signup/session token)
-  lib/           # game registry/manifest, convex client, avatars, puzzle engine
+  lib/           # game registry/manifest, pass & play helpers, fixed puzzles, puzzle engine
   tracks/        # Audio track definitions
   types.ts       # Shared TypeScript interfaces
 
 convex/
-  schema.ts      # Database schema (13 tables)
+  schema.ts      # Database schema (16 tables)
   auth.ts        # Sign up, login (hashed PINs, lockout), sessions, admin tools
   model/auth.ts  # PIN hashing + session helpers
   games.ts       # Score saving, leaderboard queries
@@ -164,7 +187,17 @@ convex/
   multiplayer.ts # Invites, lobbies, live sessions
   reports.ts     # Issue reports and game requests
   webhooks.ts    # HTTP endpoint for bot-reported errors (Linear integration)
+  gifs.ts        # GIPHY search proxy (G-rated, kid mode denied)
+  puzzles.ts     # Family puzzles, weekly puzzle times + boards
+  clues.ts       # AI clue suggestions (Anthropic SDK, rate-limited)
+  recap.ts       # Weekly family recap query + email
+  crons.ts       # Sunday recap schedule
   migrations.ts  # One-time data migrations
+
+scripts/
+  game-art/      # SVG game tile generator (pnpm art:build)
+  og/            # Link-preview image builder (pnpm og:build)
+  jev-audit/     # Content audit tooling
 
 tests/
   convex/        # Backend tests (convex-test)
