@@ -251,8 +251,10 @@ function ScrabbleGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficul
       : tied
         ? `Tied at ${mine}!`
         : `You scored ${mine} · best was ${best}.`;
-    schedule(() => onEnd({ score: mine, stars, summary }), 800);
-  }, [targetScore, onEnd, schedule, isLocal, local.finish]);
+    // Not schedule(): it drops callbacks once the game is marked ended.
+    // Tracked so unmount still cancels it.
+    timeoutsRef.current.push(setTimeout(() => onEnd({ score: mine, stars, summary }), 800));
+  }, [targetScore, onEnd, isLocal, local.finish]);
 
   const handleRackClick = (idx: number) => {
     if (!isHumanTurn) return;
