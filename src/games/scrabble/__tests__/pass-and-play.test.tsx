@@ -31,6 +31,9 @@ const MIA: LocalSeat = { name: 'Mia', avatar: '🦊' };
 const LEO: LocalSeat = { name: 'Leo', avatar: '🐸' };
 // Stage 1 → 12 rounds; each seat takes one turn per round.
 const ROUNDS = 12;
+// Whole-game tests click through dozens of curtained turns; under a full
+// parallel suite run that can exceed Vitest's 5s default.
+const FULL_GAME_TIMEOUT = 20_000;
 
 function makeProps(seats: LocalSeat[]): GameProps {
   return {
@@ -177,7 +180,7 @@ describe('scrabble pass & play', () => {
     expect(props.onEnd).toHaveBeenCalledWith({
       score: 0, stars: 0, summary: 'Dad wins with 15 points!', winnerSeat: 1,
     });
-  });
+  }, FULL_GAME_TIMEOUT);
 
   test('a shared top score is a draw (winnerSeat 0)', async () => {
     const props = makeProps([DAD, MIA, LEO]);
@@ -189,5 +192,5 @@ describe('scrabble pass & play', () => {
     expect(props.onEnd).toHaveBeenCalledTimes(1);
     expect(props.onEnd).toHaveBeenCalledWith(expect.objectContaining({ score: 0, stars: 0, winnerSeat: 0 }));
     expect(vi.mocked(props.onEnd).mock.calls[0][0].summary).toMatch(/tie/i);
-  });
+  }, FULL_GAME_TIMEOUT);
 });

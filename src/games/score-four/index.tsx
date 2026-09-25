@@ -198,6 +198,13 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
     timeoutsRef.current.push(id);
   }, []);
 
+  // The final onEnd must fire even though the game is already marked ended
+  // (that flag is what stops further turns); unmount still cancels it.
+  const scheduleEnd = useCallback((result: GameResult, delay: number) => {
+    const id = setTimeout(() => onEnd(result), delay);
+    timeoutsRef.current.push(id);
+  }, [onEnd]);
+
   useEffect(() => {
     endedRef.current = false;
     return () => {
@@ -258,8 +265,8 @@ function ScoreFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
       : 'The AI lined up four first. Study the diagonals!';
     onScore(score);
     onProgress(result === 'win' ? 1 : 0.4);
-    schedule(() => onEnd({ score, stars, summary }), 1100);
-  }, [onScore, onProgress, onEnd, schedule]);
+    scheduleEnd({ score, stars, summary }, 1100);
+  }, [onScore, onProgress, scheduleEnd]);
 
   const markWinning = useCallback((line: number[]) => {
     setBeads(prev => prev.map(b => (line.includes(idx(b.x, b.y, b.z)) ? { ...b, winning: true } : b)));

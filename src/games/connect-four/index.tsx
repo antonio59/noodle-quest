@@ -56,6 +56,13 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
     return id;
   }, []);
 
+  // The final onEnd must fire even though the game is already marked ended
+  // (that flag is what stops further turns); unmount still cancels it.
+  const scheduleEnd = useCallback((result: GameResult, delay: number) => {
+    const id = setTimeout(() => onEnd(result), delay);
+    timeoutsRef.current.push(id);
+  }, [onEnd]);
+
   useEffect(() => {
     endedRef.current = false;
     return () => {
@@ -140,14 +147,14 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
       onProgress(1);
       onMessage('You connected four!');
       endedRef.current = true;
-      schedule(() => onEnd({ score: 120, stars: 3, summary: 'You connected four in a row! Well done!' }), 800);
+      scheduleEnd({ score: 120, stars: 3, summary: 'You connected four in a row! Well done!' }, 800);
       return;
     }
     if (isFull(nb)) {
       setWinner('draw');
       onMessage("It's a draw!");
       endedRef.current = true;
-      schedule(() => onEnd({ score: 40, stars: 2, summary: "It's a draw — the board is full!" }), 800);
+      scheduleEnd({ score: 40, stars: 2, summary: "It's a draw — the board is full!" }, 800);
       return;
     }
 
@@ -167,7 +174,7 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
           setWinner('yellow');
           onMessage('AI connected four!');
           endedRef.current = true;
-          schedule(() => onEnd({ score: 10, stars: 1, summary: 'The AI connected four first. Try again!' }), 1000);
+          scheduleEnd({ score: 10, stars: 1, summary: 'The AI connected four first. Try again!' }, 1000);
           return;
         }
       }
@@ -175,7 +182,7 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
         setWinner('draw');
         onMessage("It's a draw!");
         endedRef.current = true;
-        schedule(() => onEnd({ score: 40, stars: 2, summary: "It's a draw — the board is full!" }), 800);
+        scheduleEnd({ score: 40, stars: 2, summary: "It's a draw — the board is full!" }, 800);
         return;
       }
       setTurn('red');

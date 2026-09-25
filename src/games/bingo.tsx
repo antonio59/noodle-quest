@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { GameProps } from '@/types';
+import type { GameProps, GameResult } from '@/types';
 
 const COL_LABELS = ['B', 'I', 'N', 'G', 'O'];
 const COL_RANGES: [number, number][] = [[1, 15], [16, 30], [31, 45], [46, 60], [61, 75]];
@@ -93,6 +93,13 @@ function BingoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
     timeoutsRef.current.push(id);
     return id;
   }, []);
+
+  // The final onEnd must fire even though the game is already marked ended
+  // (that flag is what stops further turns); unmount still cancels it.
+  const scheduleEnd = useCallback((result: GameResult, delay: number) => {
+    const id = setTimeout(() => onEnd(result), delay);
+    timeoutsRef.current.push(id);
+  }, [onEnd]);
 
   useEffect(() => {
     endedRef.current = false;
@@ -193,7 +200,7 @@ function BingoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
         setCalling(false);
         onMessage('AI got Bingo!');
         endedRef.current = true;
-        schedule(() => onEnd({ score: 10, stars: 1, summary: 'The AI got Bingo first. Better luck next time!' }), 1500);
+        scheduleEnd({ score: 10, stars: 1, summary: 'The AI got Bingo first. Better luck next time!' }, 1500);
       }
     }, callSpeed);
 
@@ -232,7 +239,7 @@ function BingoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
 
       onMessage('BINGO! You won!');
       endedRef.current = true;
-      schedule(() => onEnd({ score: 150, stars: 3, summary: 'You got BINGO! Great listening skills!' }), 1000);
+      scheduleEnd({ score: 150, stars: 3, summary: 'You got BINGO! Great listening skills!' }, 1000);
     }
   };
 
