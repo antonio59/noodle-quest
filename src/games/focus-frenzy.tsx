@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 interface Orb {
   id: number;
@@ -176,7 +177,7 @@ export default function FocusFrenzyGame({ stage, onScore, onProgress, onEnd }: G
   if (phase === 'ready') {
     return (
       <div className="flex flex-col h-full min-h-[350px] items-center justify-center gap-5 p-6 text-center">
-        <div className="text-6xl">🔮</div>
+        <GameArt gameId="focus-frenzy" emoji="🔮" size={80} />
         <h2 className="text-2xl font-bold text-accent">Focus Frenzy</h2>
         <div className="bg-card rounded-2xl p-4 max-w-xs w-full space-y-3">
           <div className="flex items-center gap-3">

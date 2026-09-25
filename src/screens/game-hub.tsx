@@ -425,15 +425,15 @@ export function GameHub() {
                         Play
                       </button>
                       {(isMulti || g.passAndPlay) && (
-                        <div className="flex gap-1.5 mt-1.5 w-full">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1.5 w-full">
                           {g.passAndPlay && (
                             <button
                               type="button"
                               onClick={() => navigateToPassAndPlay(g.id)}
                               aria-label={`${g.name}: pass and play on this device`}
-                              className="flex-1 flex items-center justify-center gap-1 bg-surface border border-white/10 text-text-muted text-[11px] font-bold py-2 rounded-xl hover:bg-card-hover hover:text-accent hover:border-accent/30 transition-all active:scale-95"
+                              className="flex items-center justify-center gap-1 whitespace-nowrap bg-surface border border-white/10 text-text-muted text-[11px] font-bold py-2 rounded-xl hover:bg-card-hover hover:text-accent hover:border-accent/30 transition-all active:scale-95"
                             >
-                              <Smartphone size={12} aria-hidden /> Together
+                              <Smartphone size={12} aria-hidden /> Pass & play
                             </button>
                           )}
                           {isMulti && (
@@ -441,7 +441,7 @@ export function GameHub() {
                               type="button"
                               onClick={() => navigateToMultiplayer(g.id)}
                               aria-label={`${g.name}: play online with family`}
-                              className="flex-1 flex items-center justify-center gap-1 bg-surface border border-white/10 text-text-muted text-[11px] font-bold py-2 rounded-xl hover:bg-card-hover hover:text-accent hover:border-accent/30 transition-all active:scale-95"
+                              className="flex items-center justify-center gap-1 whitespace-nowrap bg-surface border border-white/10 text-text-muted text-[11px] font-bold py-2 rounded-xl hover:bg-card-hover hover:text-accent hover:border-accent/30 transition-all active:scale-95"
                             >
                               <Globe size={12} aria-hidden /> Online
                             </button>

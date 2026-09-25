@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 const CONFIG: Record<number, { minLen: number; maxLen: number; showTime: number; maxRounds: number }> = {
   1: { minLen: 2, maxLen: 3, showTime: 2500, maxRounds: 4 },
@@ -186,7 +187,7 @@ function NumberNinjaGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'ready') {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-5 p-6 text-center">
-        <div className="text-6xl">🥷</div>
+        <GameArt gameId="number-ninja" emoji="🥷" size={80} />
         <h2 className="text-2xl font-bold text-accent">Number Ninja</h2>
         <div className="bg-card rounded-2xl p-4 max-w-xs w-full space-y-2 text-sm text-text-muted">
           <p>👁️ <span className="text-text">See</span> the number sequence</p>

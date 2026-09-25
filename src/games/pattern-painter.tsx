@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { GameArt } from '@/components/GameArt';
 
 interface ShapeDef {
   type: string;
@@ -381,7 +382,7 @@ function PatternPainterGame({ stage, onScore, onProgress, onMessage, onEnd }: Ga
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-6 text-center">
-        <div className="text-6xl mb-4">🎨</div>
+        <GameArt gameId="pattern-painter" emoji="🎨" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-accent mb-2">Pattern Painter</h2>
         <p className="text-text-dim mb-4 max-w-xs">Trace the dotted shapes with your finger or mouse!</p>
 

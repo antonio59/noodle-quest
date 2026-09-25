@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 type BubbleState = 'waiting' | 'ready' | 'trap';
 
@@ -211,7 +212,7 @@ function PatiencePopGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'ready') {
     return (
       <div className="flex flex-col h-full min-h-[350px] items-center justify-center gap-4">
-        <div className="text-6xl">🫧</div>
+        <GameArt gameId="patience-pop" emoji="🫧" size={80} />
         <h2 className="text-xl font-bold text-text">Patience Pop</h2>
         <p className="text-text-muted text-sm text-center max-w-xs">
           Bubbles will float up.<br />

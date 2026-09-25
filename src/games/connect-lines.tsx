@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GameProps } from '@/types';
 import { RotateCw, Sparkles } from 'lucide-react';
+import { GameArt } from '@/components/GameArt';
 
 /**
  * Connect Lines: tap tiles to rotate their pipe segments. The puzzle is
@@ -255,7 +256,7 @@ export default function ConnectLinesGame({ stage = 1, onScore, onProgress, onEnd
   if (ready) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-5 p-6 text-center">
-        <div className="text-6xl">🔌</div>
+        <GameArt gameId="connect-lines" emoji="🔌" size={80} />
         <h2 className="text-2xl font-bold text-accent">Connect Lines</h2>
         <div className="bg-card rounded-2xl p-4 max-w-xs w-full space-y-3 text-sm text-text-muted">
           <p>🔄 <span className="text-text">Tap</span> a pipe tile to rotate it</p>

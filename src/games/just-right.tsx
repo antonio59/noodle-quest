@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 const CONFIG: Record<number, { target: number; time: number; tolerance: number }> = {
   1: { target: 5, time: 0, tolerance: 2 },
@@ -203,7 +204,7 @@ function JustRightGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-5 text-center">
-        <div className="text-6xl mb-4">🎨</div>
+        <GameArt gameId="just-right" emoji="🎨" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-[#c084fc] mb-2">Just Right</h2>
         <p className="text-[#f0a83a] mb-4 max-w-xs">Splatter paint, then stop when you have JUST the right amount!</p>
         <div className="bg-[#1a332e] rounded-xl p-4 mb-5 max-w-xs">

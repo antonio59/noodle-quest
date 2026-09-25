@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
 import { playMove, playCapture, playLose } from '@/lib/feedback';
+import { GameArt } from '@/components/GameArt';
 
 type Phase = 'ready' | 'playing' | 'done';
 type MoleType = 'mole' | 'gold' | 'decoy';
@@ -181,7 +182,7 @@ export default function MoleMash({ stage, onScore, onProgress, onEnd, onMessage,
   if (phase === 'ready') {
     return (
       <div className="flex flex-col h-full min-h-[350px] items-center justify-center gap-5 px-4">
-        <div className="text-6xl">🔨</div>
+        <GameArt gameId="mole-mash" emoji="🔨" size={80} />
         <h2 className="text-xl font-bold text-text">Mole Mash</h2>
         <div className="bg-card rounded-2xl p-4 w-full max-w-xs space-y-2">
           <div className="flex justify-between text-sm">

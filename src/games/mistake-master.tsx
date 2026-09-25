@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { GameArt } from '@/components/GameArt';
 
 interface Challenge {
   task: string;
@@ -273,7 +274,7 @@ function MistakeMasterGame({ stage, onScore, onProgress, onMessage, onEnd }: Gam
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-6 text-center">
-        <div className="text-6xl mb-4">🌱</div>
+        <GameArt gameId="mistake-master" emoji="🌱" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-success mb-2">Mistake Master</h2>
         <p className="text-success/70 mb-4 max-w-xs">
           Learn why mistakes are actually GOOD for your brain!

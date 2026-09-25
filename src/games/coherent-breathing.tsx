@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { GameProps } from '@/types';
 import { Waves, Heart, Battery, Activity } from 'lucide-react';
+import { GameArt } from '@/components/GameArt';
 
 // Coherent/Resonance Breathing: inhale Ns, exhale Ns (~5.5 breaths/min)
 // Activates parasympathetic nervous system
@@ -114,7 +115,7 @@ function CoherentBreathingGame({ stage, onScore, onProgress, onMessage, onEnd }:
       <div className="h-full overflow-y-auto">
         <div className="p-6 max-w-md mx-auto">
           <div className="text-center mb-6">
-            <div className="text-6xl mb-3">☯️</div>
+            <GameArt gameId="coherent-breathing" emoji="☯️" size={80} className="mb-3" />
             <h2 className="text-2xl font-bold text-accent">Coherent Breathing</h2>
             <p className="text-text-muted text-sm mt-1">Heart-breath synchronization at ~{breathsPerMin} breaths/min</p>
           </div>
@@ -178,7 +179,7 @@ function CoherentBreathingGame({ stage, onScore, onProgress, onMessage, onEnd }:
   if (phase === 'idle') {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-6xl mb-4">☯️</div>
+        <GameArt gameId="coherent-breathing" emoji="☯️" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-accent mb-2">Coherent Breathing</h2>
         <p className="text-text-muted mb-6 max-w-xs">
           Inhale {breathLen}s, Exhale {breathLen}s. ~{breathsPerMin} breaths/min.

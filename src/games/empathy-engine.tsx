@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { GameArt } from '@/components/GameArt';
 
 interface Scenario {
   friend: string;
@@ -335,7 +336,7 @@ function EmpathyEngineGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-5 text-center">
-        <div className="text-6xl mb-4">💝</div>
+        <GameArt gameId="empathy-engine" emoji="💝" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-[#f472b6] mb-2">Empathy Engine</h2>
         <p className="text-[#fb7185] mb-4 max-w-xs">Choose the most helpful response for your friends!</p>
         <div className="bg-[#1a332e] rounded-xl p-4 mb-5 max-w-xs">

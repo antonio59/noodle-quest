@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GameProps } from '@/types';
 import { evaluateSequence } from '@/lib/sequence-scorer';
+import { GameArt } from '@/components/GameArt';
 
 interface Task {
   emoji: string;
@@ -292,7 +293,7 @@ function RoutineRoadmapGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-5 text-center">
-        <div className="text-6xl mb-4">📋</div>
+        <GameArt gameId="routine-roadmap" emoji="📋" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-[#fbbf24] mb-2">Routine Roadmap</h2>
         <p className="text-[#fcd34d] mb-4 max-w-xs">Put the tasks in the right order!</p>
         <div className="bg-[#1a332e] rounded-xl p-4 mb-5 max-w-xs">

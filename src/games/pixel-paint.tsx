@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 const COLORS = ['#1a332e', '#ff6e6c', '#c084fc', '#67e8f9', '#4ade80', '#fbbf24'];
 
@@ -189,7 +190,7 @@ function PixelPaintGame({ stage, onScore, onProgress, onMessage, onEnd }: GamePr
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-6 text-center">
-        <div className="text-6xl mb-4">🟦</div>
+        <GameArt gameId="pixel-paint" emoji="🟦" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-accent mb-2">Pixel Paint</h2>
         <p className="text-text-dim mb-4 max-w-xs">Copy the pixel art by tapping squares!</p>
 

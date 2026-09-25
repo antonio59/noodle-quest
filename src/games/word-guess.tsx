@@ -3,6 +3,7 @@ import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
 import { EN_GB_CORE_WORDS } from '@/data/words/en-gb-core';
 import { playMove, playPlace } from '@/lib/feedback';
+import { GameArt } from '@/components/GameArt';
 
 type Mark = 'correct' | 'present' | 'absent';
 type Phase = 'ready' | 'playing' | 'done';
@@ -232,7 +233,7 @@ export default function WordGuess({ stage, onScore, onProgress, onEnd, onMessage
   if (phase === 'ready') {
     return (
       <div className="flex flex-col h-full min-h-[350px] items-center justify-center gap-5 px-4">
-        <div className="text-6xl">🟩</div>
+        <GameArt gameId="word-guess" emoji="🟩" size={80} />
         <h2 className="text-xl font-bold text-text">Word Guess</h2>
         <div className="bg-card rounded-2xl p-4 w-full max-w-xs space-y-2">
           <div className="flex justify-between text-sm">

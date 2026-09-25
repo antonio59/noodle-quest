@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { GameArt } from '@/components/GameArt';
 
 interface Texture {
   name: string;
@@ -187,7 +188,7 @@ function SquishLabGame({ stage, onScore, onProgress, onMessage, onEnd }: GamePro
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-6 text-center">
-        <div className="text-6xl mb-4">🧪</div>
+        <GameArt gameId="squish-lab" emoji="🧪" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-accent mb-2">Squish Lab</h2>
         <p className="text-text-dim mb-4 max-w-xs">
           Touch squishy experiments and hold on as long as you can!

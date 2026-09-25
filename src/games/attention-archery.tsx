@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 interface ArcheryTarget {
   id: number;
@@ -199,7 +200,7 @@ function AttentionArcheryGame({ stage, onScore, onProgress, onEnd }: GameProps) 
   if (phase === 'ready') {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-5 p-6 text-center">
-        <div className="text-6xl">🏹</div>
+        <GameArt gameId="attention-archery" emoji="🏹" size={80} />
         <h2 className="text-2xl font-bold text-accent">Attention Archery</h2>
         <div className="bg-card rounded-2xl p-4 max-w-xs w-full space-y-3">
           <div className="flex items-center gap-3">

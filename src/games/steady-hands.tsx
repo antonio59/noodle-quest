@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 interface Point { x: number; y: number }
 interface Checkpoint { x: number; y: number; collected: boolean }
@@ -359,7 +360,7 @@ function SteadyHandsGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-6 text-center gap-4">
-        <div className="text-6xl">🎯</div>
+        <GameArt gameId="steady-hands" emoji="🎯" size={80} />
         <h2 className="text-2xl font-bold text-accent">Steady Hands</h2>
         <p className="text-text-dim max-w-xs">Drag the ball along the path to reach the finish — without touching the walls!</p>
 

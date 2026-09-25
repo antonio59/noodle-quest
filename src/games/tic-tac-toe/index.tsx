@@ -4,6 +4,7 @@ import { checkWinner, bestMove, type Cell, type Player, type WinLine } from './l
 import { playMove } from '@/lib/feedback';
 import { seatAt } from '@/lib/pass-and-play';
 import { TurnBanner } from '@/components/pass-and-play/TurnBanner';
+import { GameArt } from '@/components/GameArt';
 
 /** Pause on the finished board before pass & play hands over to the result screen. */
 const LOCAL_END_DELAY_MS = 900;
@@ -203,11 +204,11 @@ function TicTacToeGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficu
   if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
-        <div className="text-6xl">⭕</div>
+        <GameArt gameId="tic-tac-toe" emoji="⭕" size={80} />
         <h2 className="text-2xl font-bold">Tic-Tac-Toe</h2>
         <div className="bg-card rounded-xl p-4 max-w-xs w-full space-y-2 text-sm">
           <div className="flex items-center gap-2"><span>✖️</span><span className="text-text-muted">You are X — get 3 in a row to win</span></div>
-          <div className="flex items-center gap-2"><span>🏆</span><span className="text-text-muted">Target: <span className="text-accent">{targetWins} wins</span> to complete the stage</span></div>
+          <div className="flex items-center gap-2"><span>🏆</span><span className="text-text-muted">Target: <span className="text-accent">{targetWins} {targetWins === 1 ? 'win' : 'wins'}</span> to complete the stage</span></div>
           <div className="flex items-center gap-2"><span>🤖</span><span className="text-text-muted capitalize">AI difficulty: <span className="text-accent">{difficulty}</span></span></div>
         </div>
         <button

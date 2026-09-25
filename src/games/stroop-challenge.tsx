@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 const COLORS = [
   { name: 'RED',    hex: '#ef4444' },
@@ -181,7 +182,7 @@ export default function StroopChallenge({ stage, onScore, onProgress, onEnd }: G
   if (phase === 'ready') {
     return (
       <div className="flex flex-col h-full min-h-[350px] items-center justify-center gap-5 px-4">
-        <div className="text-6xl">🧩</div>
+        <GameArt gameId="stroop-challenge" emoji="🧩" size={80} />
         <h2 className="text-xl font-bold text-text">Stroop Challenge</h2>
         <div className="bg-card rounded-2xl p-4 w-full max-w-sm space-y-3 text-sm">
           <div className="text-center text-text-muted mb-1 font-semibold text-xs uppercase tracking-wide">How it works</div>

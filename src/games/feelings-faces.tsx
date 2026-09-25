@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { GameArt } from '@/components/GameArt';
 
 interface Question {
   scenario: string;
@@ -209,7 +210,7 @@ function FeelingsFacesGame({ stage, onScore, onProgress, onEnd }: GameProps) {
     const sampleEmojis = questions.map(q => q.emoji).slice(0, 5);
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-6 text-center gap-4">
-        <div className="text-6xl">🫀</div>
+        <GameArt gameId="feelings-faces" emoji="🫀" size={80} />
         <h2 className="text-2xl font-bold text-accent">Feelings Faces</h2>
         <p className="text-text-dim max-w-xs">Read the situation and pick the feeling that matches!</p>
 

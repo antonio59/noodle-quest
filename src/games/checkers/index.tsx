@@ -8,6 +8,7 @@ import {
 import { playMove, playCapture } from '@/lib/feedback';
 import { useBoardCursor } from '@/hooks/useBoardCursor';
 import { LocalScoreboard, localResult, turnLabel } from './pass-and-play';
+import { GameArt } from '@/components/GameArt';
 
 function CheckersGame({
   stage,
@@ -302,7 +303,7 @@ function CheckersGame({
   if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
-        <div className="text-6xl">♟</div>
+        <GameArt gameId="checkers" emoji="♟" size={80} />
         <h2 className="text-2xl font-bold">Checkers</h2>
         <div className="bg-card rounded-xl p-4 max-w-xs w-full space-y-2 text-sm">
           <div className="flex items-center gap-2"><span>🔴</span><span className="text-text-muted">You are Red — move diagonally forward</span></div>

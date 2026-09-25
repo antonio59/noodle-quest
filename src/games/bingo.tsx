@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameProps, GameResult } from '@/types';
+import { GameArt } from '@/components/GameArt';
 
 const COL_LABELS = ['B', 'I', 'N', 'G', 'O'];
 const COL_RANGES: [number, number][] = [[1, 15], [16, 30], [31, 45], [46, 60], [61, 75]];
@@ -256,7 +257,7 @@ function BingoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
   if (!started) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
-        <div className="text-6xl">🔢</div>
+        <GameArt gameId="bingo" emoji="🔢" size={80} />
         <h2 className="text-2xl font-bold">Bingo</h2>
         <div className="bg-card rounded-xl p-4 max-w-xs w-full space-y-2 text-sm">
           <div className="flex items-center gap-2"><span>📢</span><span className="text-text-muted">Numbers will be called automatically</span></div>

@@ -5,6 +5,7 @@ import {
   NO_SEATS, isLocalTable, localWinResult, withSeatAt,
   LocalRaceHeader, LocalRaceTokens, LocalRaceProgress,
 } from './snakes-ladders-local';
+import { GameArt } from '@/components/GameArt';
 
 // Define AI difficulty levels
 const DIFFICULTY_LEVELS = {
@@ -350,7 +351,7 @@ function SnakesLaddersGame({ stage, onScore, onProgress, onMessage, onEnd, aiDif
   if (!started) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
-        <div className="text-6xl">🐍</div>
+        <GameArt gameId="snakes-ladders" emoji="🐍" size={80} />
         <h2 className="text-2xl font-bold">Snakes & Ladders</h2>
         <p className="text-text-muted text-sm text-center max-w-xs">Roll the dice, climb ladders, avoid snakes. Reach square 100 first!</p>
         <button

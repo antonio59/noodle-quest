@@ -21,6 +21,12 @@ interface WordSearchGridProps {
 
 const CELL_REM = 2.25;
 const GAP_REM = 0.125;
+// Horizontal room the board never gets on a phone: page + board padding.
+const CHROME_REM = 3.25;
+
+// Cells shrink to fit narrow screens (max CELL_REM); pills use the same vars.
+const CELL = 'var(--ws-cell)';
+const STEP = 'var(--ws-step)';
 
 export function WordSearchGrid({
   grid,
@@ -34,12 +40,18 @@ export function WordSearchGrid({
   onTouchMove,
   onTouchEnd,
 }: WordSearchGridProps) {
-  const boardRem = gridSize * CELL_REM + (gridSize - 1) * GAP_REM;
+  const gapsRem = (gridSize - 1) * GAP_REM;
+  const sizing = {
+    '--ws-cell': `min(${CELL_REM}rem, calc((100vw - ${CHROME_REM + gapsRem}rem) / ${gridSize}))`,
+    '--ws-step': `calc(var(--ws-cell) + ${GAP_REM}rem)`,
+    width: `calc(${STEP} * ${gridSize} - ${GAP_REM}rem)`,
+    height: `calc(${STEP} * ${gridSize} - ${GAP_REM}rem)`,
+  } as React.CSSProperties;
 
   return (
     <div
       className="relative select-none touch-none"
-      style={{ width: `${boardRem}rem`, height: `${boardRem}rem` }}
+      style={sizing}
       onMouseLeave={onMouseUp}
       onMouseUp={onMouseUp}
       onTouchEnd={onTouchEnd}
@@ -55,8 +67,8 @@ export function WordSearchGrid({
       <div
         className="grid relative z-10"
         style={{
-          gridTemplateColumns: `repeat(${gridSize}, ${CELL_REM}rem)`,
-          gridAutoRows: `${CELL_REM}rem`,
+          gridTemplateColumns: `repeat(${gridSize}, ${CELL})`,
+          gridAutoRows: CELL,
           gap: `${GAP_REM}rem`,
         }}
       >
@@ -99,28 +111,20 @@ function WordPill({ overlay }: { overlay: FoundWordOverlay }) {
   const [sr, sc] = cells[0];
   const [er, ec] = cells[cells.length - 1];
 
-  const cx1 = sc * (CELL_REM + GAP_REM) + CELL_REM / 2;
-  const cy1 = sr * (CELL_REM + GAP_REM) + CELL_REM / 2;
-  const cx2 = ec * (CELL_REM + GAP_REM) + CELL_REM / 2;
-  const cy2 = er * (CELL_REM + GAP_REM) + CELL_REM / 2;
-
-  const dx = cx2 - cx1;
-  const dy = cy2 - cy1;
-  const length = Math.sqrt(dx * dx + dy * dy) + CELL_REM * 0.88;
+  // Positions in grid steps; the CSS vars turn steps into length.
+  const dx = ec - sc;
+  const dy = er - sr;
+  const steps = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-  const midX = (cx1 + cx2) / 2;
-  const midY = (cy1 + cy2) / 2;
-  const thickness = CELL_REM * 0.86;
 
   return (
     <div
       className="absolute rounded-full"
       style={{
-        left: `${midX}rem`,
-        top: `${midY}rem`,
-        width: `${length}rem`,
-        height: `${thickness}rem`,
+        left: `calc(${STEP} * ${(sc + ec) / 2} + ${CELL} / 2)`,
+        top: `calc(${STEP} * ${(sr + er) / 2} + ${CELL} / 2)`,
+        width: `calc(${STEP} * ${steps} + ${CELL} * 0.88)`,
+        height: `calc(${CELL} * 0.86)`,
         transform: `translate(-50%, -50%) rotate(${angle}deg)`,
         background: overlay.color,
         opacity: 0.82,

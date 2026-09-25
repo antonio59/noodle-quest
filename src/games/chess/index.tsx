@@ -5,6 +5,7 @@ import { bestMove } from './logic';
 import { playMove, playCapture } from '@/lib/feedback';
 import { useBoardCursor } from '@/hooks/useBoardCursor';
 import { COLOR_LABEL, LocalTurnHeader, localResult, seatTag, turnLabel } from './pass-and-play';
+import { GameArt } from '@/components/GameArt';
 
 const PIECE_UNICODE: Record<string, string> = {
   wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
@@ -316,7 +317,7 @@ function ChessGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty,
   if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
-        <div className="text-6xl">♔</div>
+        <GameArt gameId="chess" emoji="♔" size={80} />
         <h2 className="text-2xl font-bold">Chess</h2>
         <div className="bg-card rounded-xl p-4 max-w-xs w-full space-y-2 text-sm">
           <div className="flex items-center gap-2"><span>⚔️</span><span className="text-text-muted">You play White — make the first move</span></div>

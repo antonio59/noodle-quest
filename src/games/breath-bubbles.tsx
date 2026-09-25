@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 type Phase = 'intro' | 'playing' | 'done';
 
@@ -231,7 +232,7 @@ function BreathBubblesGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-5 text-center">
-        <div className="text-6xl mb-4">🫧</div>
+        <GameArt gameId="breath-bubbles" emoji="🫧" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-cyan-400 mb-2">Breath Bubbles</h2>
         <p className="text-cyan-200 mb-4 max-w-xs">Blow perfect bubbles by breathing slow and steady!</p>
 

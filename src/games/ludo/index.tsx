@@ -13,6 +13,7 @@ import {
 } from './local';
 import { seatAt } from '@/lib/pass-and-play';
 import { playDice, playMove, playCapture } from '@/lib/feedback';
+import { GameArt } from '@/components/GameArt';
 
 const C = 26;
 const N = 15;
@@ -640,7 +641,7 @@ function LudoGame({ stage: _stage, onScore, onProgress, onMessage, onEnd, aiDiff
   if (!started) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-5 p-6 text-center">
-        <div className="text-6xl select-none">🎲</div>
+        <GameArt gameId="ludo" emoji="🎲" size={80} />
         <div>
           <h2 className="text-2xl font-bold mb-1">Ludo</h2>
           <p className="text-text-muted text-sm max-w-xs">{introBlurb}</p>

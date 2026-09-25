@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 const COLOR_DATA = [
   { color: '#ff6e6c', emoji: '🔴' },
@@ -173,7 +174,7 @@ function CopyCatGame({ stage, onScore, onProgress, onMessage, onEnd }: GameProps
   if (phase === 'intro') {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center gap-4">
-        <div className="text-6xl">🐱</div>
+        <GameArt gameId="copy-cat" emoji="🐱" size={80} />
         <h2 className="text-2xl font-bold text-accent">Copy Cat</h2>
         <p className="text-text-dim max-w-xs">Watch the pattern light up, then tap it — sometimes forwards, sometimes backwards!</p>
 

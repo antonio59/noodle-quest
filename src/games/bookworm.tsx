@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GameProps } from '@/types';
 import { EN_GB_CORE_WORDS } from '@/data/words/en-gb-core';
 import { Sparkles, Trash2, Check } from 'lucide-react';
+import { GameArt } from '@/components/GameArt';
 
 /**
  * Bookworm: click adjacent letter tiles to spell words.
@@ -248,7 +249,7 @@ export default function BookwormGame({ stage = 1, onScore, onProgress, onEnd, on
   if (ready) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-5 p-6 text-center">
-        <div className="text-6xl">📚</div>
+        <GameArt gameId="bookworm" emoji="📚" size={80} />
         <h2 className="text-2xl font-bold text-accent">Bookworm</h2>
         <div className="bg-card rounded-2xl p-4 max-w-xs w-full space-y-3 text-sm text-text-muted">
           <p>🔤 <span className="text-text">Tap adjacent letters</span> to spell words</p>

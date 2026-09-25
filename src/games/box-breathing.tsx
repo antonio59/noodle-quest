@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { GameProps } from '@/types';
 import { Clock, Heart, Brain, Shield } from 'lucide-react';
+import { GameArt } from '@/components/GameArt';
 
 type Phase = 'inhale' | 'hold1' | 'exhale' | 'hold2' | 'idle' | 'info' | 'done';
 
@@ -124,7 +125,7 @@ function BoxBreathingGame({ stage, onScore, onProgress, onMessage, onEnd }: Game
       <div className="h-full overflow-y-auto">
         <div className="p-6 max-w-md mx-auto">
           <div className="text-center mb-6">
-            <div className="text-6xl mb-3">📦</div>
+            <GameArt gameId="box-breathing" emoji="📦" size={80} className="mb-3" />
             <h2 className="text-2xl font-bold text-accent">Box Breathing</h2>
             <p className="text-text-muted text-sm mt-1">The 4-4-4-4 calm-down technique</p>
           </div>
@@ -199,7 +200,7 @@ function BoxBreathingGame({ stage, onScore, onProgress, onMessage, onEnd }: Game
   if (phase === 'idle') {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-6xl mb-4">📦</div>
+        <GameArt gameId="box-breathing" emoji="📦" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-accent mb-2">Box Breathing</h2>
         <p className="text-text-muted mb-6 max-w-xs">4-4-4-4: In → Hold → Out → Hold. {totalRounds} rounds.</p>
         <button

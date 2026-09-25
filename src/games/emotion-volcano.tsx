@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameProps } from '@/types';
+import { GameArt } from '@/components/GameArt';
 
 const allScenarios: Record<number, { trigger: string; emoji: string; heat: number }[]> = {
   1: [
@@ -207,7 +208,7 @@ function EmotionVolcanoGame({ stage, onScore, onProgress, onEnd }: GameProps) {
   if (phase === 'intro') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[350px] p-5 text-center">
-        <div className="text-6xl mb-3">🌋</div>
+        <GameArt gameId="emotion-volcano" emoji="🌋" size={80} className="mb-3" />
         <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--color-danger, #ff6e6c)' }}>Emotion Volcano</h2>
         <p className="text-text-muted mb-4 max-w-xs text-sm">Keep your volcano from erupting using calming strategies!</p>
         <div className="bg-card rounded-2xl p-4 mb-4 max-w-xs w-full">

@@ -91,6 +91,7 @@ export function SeatPicker({ gameId, gameName, gameEmoji, min, max, me, family, 
         </section>
 
         {/* Family roster */}
+        {family.length > 0 && (
         <section aria-label="Family" className="w-full mb-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-2">Family</h3>
           <div className="flex flex-wrap gap-2">
@@ -114,6 +115,7 @@ export function SeatPicker({ gameId, gameName, gameEmoji, min, max, me, family, 
             })}
           </div>
         </section>
+        )}
 
         {/* Guest */}
         <form

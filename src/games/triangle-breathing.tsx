@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { GameProps } from '@/types';
 import { Mountain, Brain, Leaf, Target } from 'lucide-react';
+import { GameArt } from '@/components/GameArt';
 
 // Triangle Breathing: inhale Ns, hold Ns, exhale Ns (3 sides of a triangle)
 
@@ -112,7 +113,7 @@ function TriangleBreathingGame({ stage, onScore, onProgress, onMessage, onEnd }:
       <div className="h-full overflow-y-auto">
         <div className="p-6 max-w-md mx-auto">
           <div className="text-center mb-6">
-            <div className="text-6xl mb-3">🔺</div>
+            <GameArt gameId="triangle-breathing" emoji="🔺" size={80} className="mb-3" />
             <h2 className="text-2xl font-bold text-accent">Triangle Breathing</h2>
             <p className="text-text-muted text-sm mt-1">Equal inhale-hold-exhale, visual triangle guide</p>
           </div>
@@ -191,7 +192,7 @@ function TriangleBreathingGame({ stage, onScore, onProgress, onMessage, onEnd }:
   if (phase === 'idle') {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-6xl mb-4">🔺</div>
+        <GameArt gameId="triangle-breathing" emoji="🔺" size={80} className="mb-4" />
         <h2 className="text-2xl font-bold text-accent mb-2">Triangle Breathing</h2>
         <p className="text-text-muted mb-6 max-w-xs">In {breathLen}s → Hold {breathLen}s → Out {breathLen}s. {totalRounds} rounds.</p>
         <button onClick={startCycle} className="bg-accent text-bg font-bold px-8 py-3 rounded-xl text-lg hover:opacity-90 active:scale-95">

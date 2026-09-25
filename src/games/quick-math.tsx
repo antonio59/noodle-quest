@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { GameProps } from '@/types';
 import { scaleFromLast } from '@/lib/endless-stage';
+import { GameArt } from '@/components/GameArt';
 
 type Phase = 'ready' | 'playing' | 'done';
 type AnswerState = 'correct' | 'wrong' | 'timeout' | null;
@@ -251,7 +252,7 @@ export default function QuickMath({ stage, onScore, onProgress, onEnd, paused }:
   if (phase === 'ready') {
     return (
       <div className="flex flex-col h-full min-h-[350px] items-center justify-center gap-5 px-4">
-        <div className="text-6xl">🧮</div>
+        <GameArt gameId="quick-math" emoji="🧮" size={80} />
         <h2 className="text-xl font-bold text-text">Quick Math</h2>
         <div className="bg-card rounded-2xl p-4 w-full max-w-xs space-y-2">
           <div className="flex justify-between text-sm">

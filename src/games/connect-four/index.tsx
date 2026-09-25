@@ -7,6 +7,7 @@ import {
 import { playPlace } from '@/lib/feedback';
 import { seatAt } from '@/lib/pass-and-play';
 import { TurnBanner } from '@/components/pass-and-play/TurnBanner';
+import { GameArt } from '@/components/GameArt';
 
 /** Pause on the finished board before pass & play hands over to the result screen. */
 const LOCAL_END_DELAY_MS = 900;
@@ -238,7 +239,7 @@ function ConnectFourGame({ stage, onScore, onProgress, onMessage, onEnd, aiDiffi
   if (!started && !isLocal) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
-        <div className="text-6xl">🔴</div>
+        <GameArt gameId="connect-four" emoji="🔴" size={80} />
         <h2 className="text-2xl font-bold">Connect Four</h2>
         <p className="text-text-muted text-sm text-center max-w-xs">
           Drop discs to connect 4 in a row — horizontally, vertically, or diagonally!
