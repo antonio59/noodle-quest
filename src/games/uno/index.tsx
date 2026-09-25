@@ -1,25 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/types';
 import {
-  MAX_LOSSES, COLORS, shuffle, canPlay, handScore,
+  MAX_LOSSES, shuffle, canPlay, handScore,
   aiSelectCard, aiChooseColor, dealInitial,
   type UnoColor, type UnoCard, type AILevel, type GamePhase,
 } from './logic';
-
-const COLOR_HEX: Record<string, string> = {
-  red: '#ef4444',
-  blue: '#3b82f6',
-  green: '#22c55e',
-  yellow: '#eab308',
-  wild: '#1e1e2e',
-};
-
-const SYMBOL_DISPLAY: Record<string, string> = {
-  '0': '0', '1': '1', '2': '2', '3': '3', '4': '4',
-  '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
-  skip: '⊘', reverse: '⟲', draw2: '+2', wild: '🌟',
-};
-
+import { COLOR_HEX, SYMBOL_DISPLAY } from './display';
+import { ColorPicker, DrawPrompt, FaceDownHand, HandFan, TablePiles, UnoCallout } from './cards';
+import { LocalUno } from './local';
 
 function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, multiplayerState, onMultiplayerMove }: GameProps & { aiDifficulty?: AILevel }) {
   const difficulty: AILevel = aiDifficulty || 'medium';
@@ -563,62 +551,15 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
       </div>
 
       {/* ── AI face-down hand (stacked display) ── */}
-      <div className="relative flex items-center justify-center flex-shrink-0 h-16">
-        {Array.from({ length: Math.min(aiHand.length, 7) }).map((_, i, arr) => (
-          <div
-            key={i}
-            className="absolute w-10 h-14 rounded-md shadow-md"
-            style={{
-              background: 'linear-gradient(135deg, #2d1b69, #1a1a2e)',
-              border: '1px solid #4a3f8a',
-              left: `calc(50% + ${(i - (arr.length - 1) / 2) * 14}px - 20px)`,
-              transform: `rotate(${(i - (arr.length - 1) / 2) * 3}deg)`,
-              zIndex: i,
-            }}
-          />
-        ))}
-        {aiHand.length > 7 && (
-          <span
-            className="absolute text-[10px] text-white/60 font-bold"
-            style={{ zIndex: 10, bottom: 2, right: 'calc(50% - 40px)' }}
-          >
-            +{aiHand.length - 7}
-          </span>
-        )}
-      </div>
+      <FaceDownHand count={aiHand.length} />
 
-      <div className="flex-1 flex items-center justify-center gap-6 py-2">
-        <button
-          onClick={handleDraw}
-          disabled={!isPlayerTurn || phase !== 'playing' || aiThinking || hasPlayableCard}
-          className="relative w-16 h-24 sm:w-20 sm:h-28 rounded-lg shadow-lg flex flex-col items-center justify-center text-white font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ background: 'linear-gradient(135deg, #2d1b69, #1a1a2e)', border: '2px solid #6366f1' }}
-        >
-          <span className="text-xs opacity-70">DRAW</span>
-          <span className="text-sm font-bold">{deck.length}</span>
-        </button>
-
-        <div className="flex flex-col items-center gap-1">
-          <div
-            className="w-20 h-28 sm:w-24 sm:h-32 rounded-xl shadow-xl flex flex-col items-center justify-center text-white font-bold border-4 relative"
-            style={{
-              background: COLOR_HEX[currentColor],
-              borderColor: 'rgba(255,255,255,0.3)',
-            }}
-          >
-            <span className="text-2xl sm:text-3xl drop-shadow-lg">
-              {topCard && (topCard.type === 'wild' ? '🌟' : topCard.type === 'wild4' ? '🌟+4' : SYMBOL_DISPLAY[topCard.symbol])}
-            </span>
-            {topCard && topCard.type !== 'wild' && topCard.type !== 'wild4' && (
-              <span className="text-[10px] opacity-80 mt-1">{topCard.color.toUpperCase()}</span>
-            )}
-          </div>
-          <div
-            className="w-8 h-8 rounded-full border-2 border-white/30 shadow-md"
-            style={{ background: COLOR_HEX[currentColor] }}
-          />
-        </div>
-      </div>
+      <TablePiles
+        deckCount={deck.length}
+        drawDisabled={!isPlayerTurn || phase !== 'playing' || aiThinking || hasPlayableCard}
+        onDraw={handleDraw}
+        topCard={topCard}
+        color={currentColor}
+      />
 
       <div className="text-center text-xs py-1 min-h-[20px]">
         <span className={isAdverseMessage ? 'text-danger' : 'text-text-muted'}>
@@ -626,84 +567,22 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
         </span>
       </div>
 
-      {phase === 'choosing-color' && (
-        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-card rounded-2xl p-4 shadow-2xl flex flex-col items-center gap-3">
-            <span className="text-sm font-bold text-text">Choose a color</span>
-            <div className="grid grid-cols-2 gap-2">
-              {COLORS.map(color => (
-                <button
-                  key={color}
-                  onClick={() => handleChooseColor(color)}
-                  className="w-16 h-16 rounded-xl font-bold text-white text-sm shadow-lg transition-all hover:scale-110 active:scale-95"
-                  style={{ background: COLOR_HEX[color] }}
-                >
-                  {color.charAt(0).toUpperCase() + color.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {phase === 'choosing-color' && <ColorPicker onChoose={handleChooseColor} />}
 
       {/* UNO! alert when player has 1 card */}
-      {playerHand.length === 1 && phase === 'playing' && (
-        <div className="flex-shrink-0 text-center">
-          <span className="inline-block bg-yellow-400 text-black font-black text-xl px-4 py-1 rounded-full shadow-lg animate-bounce tracking-widest">
-            UNO!
-          </span>
-        </div>
-      )}
+      {playerHand.length === 1 && phase === 'playing' && <UnoCallout />}
 
-      <div className="w-full flex flex-col items-center gap-1 flex-shrink-0">
-        <span className="text-[10px] text-text-muted">
-          Your hand · {playerHand.length} card{playerHand.length !== 1 ? 's' : ''}
-        </span>
-        <div className="w-full flex justify-center items-end gap-0.5 px-1 overflow-x-auto max-h-32 pb-1">
-          {playerHand.map(card => {
-            const playable = isPlayerTurn && phase === 'playing' && canPlay(card, topCard, currentColor);
-            const isHighlighted = highlightCard === card.id;
-            const isWild = card.type === 'wild' || card.type === 'wild4';
-
-            return (
-              <button
-                key={card.id}
-                onClick={() => handlePlayCard(card)}
-                disabled={!playable || aiThinking}
-                className="flex-shrink-0 w-11 rounded-lg shadow-md flex flex-col items-center justify-center text-white font-bold transition-all border-2 relative"
-                style={{
-                  height: 64,
-                  background: isWild
-                    ? 'linear-gradient(135deg, #ef4444 25%, #3b82f6 25%, #3b82f6 50%, #22c55e 50%, #22c55e 75%, #eab308 75%)'
-                    : COLOR_HEX[card.color],
-                  borderColor: playable ? '#fff' : 'rgba(255,255,255,0.15)',
-                  opacity: playable ? 1 : 0.55,
-                  transform: isHighlighted ? 'scale(1.12)' : playable ? 'translateY(-6px)' : 'none',
-                  cursor: playable ? 'pointer' : 'not-allowed',
-                  boxShadow: playable ? '0 0 8px rgba(255,255,255,0.35)' : undefined,
-                }}
-              >
-                <span className="text-base drop-shadow-md leading-none">
-                  {isWild ? (card.type === 'wild4' ? '+4' : '🌟') : SYMBOL_DISPLAY[card.symbol]}
-                </span>
-                {!isWild && card.type === 'action' && (
-                  <span className="text-[7px] opacity-80 mt-0.5">
-                    {card.color.slice(0, 3).toUpperCase()}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <HandFan
+        label="Your hand"
+        hand={playerHand}
+        isPlayable={card => isPlayerTurn && phase === 'playing' && canPlay(card, topCard, currentColor)}
+        locked={aiThinking}
+        highlightId={highlightCard}
+        onPlay={handlePlayCard}
+      />
 
       {!hasPlayableCard && isPlayerTurn && phase === 'playing' && !aiThinking && (
-        <button
-          onClick={handleDraw}
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-accent text-bg font-bold px-4 py-2 rounded-xl text-sm shadow-lg animate-pulse z-40"
-        >
-          Draw a card
-        </button>
+        <DrawPrompt onDraw={handleDraw} />
       )}
 
       {phase === 'round-over' && (
@@ -740,5 +619,13 @@ function UnoGame({ stage, onScore, onProgress, onMessage, onEnd, aiDifficulty, m
   );
 }
 
-export default UnoGame;
+/** Pass & play gets its own table (hidden hands, no AI); solo and online use UnoGame. */
+function Uno(props: GameProps & { aiDifficulty?: AILevel }) {
+  const seats = props.localSeats ?? [];
+  const isLocal = !props.multiplayerState && seats.length >= 2;
+  if (isLocal) return <LocalUno seats={seats} onEnd={props.onEnd} />;
+  return <UnoGame {...props} />;
+}
+
+export default Uno;
 
