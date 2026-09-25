@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { ArrowLeft, Plus, X } from 'lucide-react';
 import type { LocalSeat } from '@/types';
+import { GameArt } from '@/components/GameArt';
 import { GUEST_AVATARS, MAX_GUEST_NAME, SEAT_COLORS, seatListError } from '@/lib/pass-and-play';
 
 interface SeatPickerProps {
+  gameId: string;
   gameName: string;
   gameEmoji: string;
   min: number;
@@ -18,7 +20,7 @@ interface SeatPickerProps {
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-export function SeatPicker({ gameName, gameEmoji, min, max, me, family, onStart, onCancel }: SeatPickerProps) {
+export function SeatPicker({ gameId, gameName, gameEmoji, min, max, me, family, onStart, onCancel }: SeatPickerProps) {
   const [seats, setSeats] = useState<LocalSeat[]>(() => (me ? [me] : []));
   const [guestName, setGuestName] = useState('');
 
@@ -45,7 +47,7 @@ export function SeatPicker({ gameName, gameEmoji, min, max, me, family, onStart,
   return (
     <div className="h-full overflow-y-auto">
       <div className="min-h-full flex flex-col items-center justify-center p-6 max-w-sm mx-auto">
-        <div className="text-5xl mb-2" aria-hidden>{gameEmoji}</div>
+        <GameArt gameId={gameId} emoji={gameEmoji} size={72} className="mb-2" />
         <h2 className="text-2xl font-bold">{gameName}</h2>
         <p className="text-text-muted text-sm mb-5 text-center">
           Pass & play — share this device and take turns.

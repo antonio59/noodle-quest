@@ -16,6 +16,7 @@ import type { GameResult } from '@/types';
 import { ReportIssueModal } from '@/components/ReportIssueModal';
 import { GameErrorBoundary } from '@/components/GameErrorBoundary';
 import { SeatPicker } from '@/components/pass-and-play/SeatPicker';
+import { GameArt } from '@/components/GameArt';
 import { MatchResult } from '@/components/pass-and-play/MatchResult';
 import { usePassAndPlay } from '@/components/pass-and-play/usePassAndPlay';
 
@@ -216,6 +217,7 @@ export function PlayGame() {
     if (!local.seats) {
       return (
         <SeatPicker
+          gameId={gameMeta.id}
           gameName={gameMeta.name}
           gameEmoji={gameMeta.emoji}
           min={passAndPlayRange.min}
@@ -250,7 +252,7 @@ export function PlayGame() {
     const roster = liveSession.players ?? [];
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-6xl mb-4">{gameMeta.emoji}</div>
+        <GameArt gameId={gameMeta.id} emoji={gameMeta.emoji} size={80} className="mb-4" />
         <h2 className="text-2xl font-bold mb-2">{gameMeta.name}</h2>
         <p className="text-text-muted text-sm mb-5">
           Waiting for {liveSession.player1Name} to start the game...
@@ -295,7 +297,7 @@ export function PlayGame() {
   if (isMultiplayer && !inviteCode && !isLivePlaying) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-6xl mb-4">{gameMeta.emoji}</div>
+        <GameArt gameId={gameMeta.id} emoji={gameMeta.emoji} size={80} className="mb-4" />
         <h2 className="text-2xl font-bold mb-2">{gameMeta.name}</h2>
         <p className="text-text-muted text-sm mb-6">Setting up your game room...</p>
         <Loader2 className="animate-spin text-accent" size={36} />
@@ -341,7 +343,7 @@ export function PlayGame() {
 
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-6xl mb-3">{gameMeta.emoji}</div>
+        <GameArt gameId={gameMeta.id} emoji={gameMeta.emoji} size={80} className="mb-3" />
         <h2 className="text-2xl font-bold mb-1">{gameMeta.name}</h2>
         <p className="text-text-muted text-sm mb-4">Share this link with your friend to start playing!</p>
         <div className="bg-card rounded-xl px-5 py-4 mb-3 w-full max-w-xs">
@@ -427,7 +429,7 @@ export function PlayGame() {
   if (showLobby) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-6xl mb-4">{gameMeta.emoji}</div>
+        <GameArt gameId={gameMeta.id} emoji={gameMeta.emoji} size={80} className="mb-4" />
         <h2 className="text-2xl font-bold mb-2">{gameMeta.name}</h2>
         <p className="text-text-muted text-sm mb-6 max-w-xs">{gameMeta.description}</p>
 

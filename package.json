@@ -17,7 +17,8 @@
     "convex:deploy": "CONVEX_DEPLOYMENT=prod:incredible-lobster-12 npx convex deploy --yes",
     "pages:dev": "npm run build && npx wrangler pages dev dist",
     "pages:deploy": "npm run build && npx wrangler pages deploy dist",
-    "audit:content": "tsx scripts/jev-audit/index.ts"
+    "audit:content": "tsx scripts/jev-audit/index.ts",
+    "art:build": "tsx scripts/game-art/build.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d0644f"/><stop offset="1" stop-color="#8f3a2c"/></linearGradient>
+<filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.5" stdDeviation="0.6" flood-color="#0b1a16" flood-opacity=".35"/></filter>
+<clipPath id="tile"><rect width="96" height="96" rx="24"/></clipPath>
+</defs>
+<rect width="96" height="96" rx="24" fill="url(#bg)"/>
+<circle cx="18" cy="8" r="48" fill="#fff" opacity=".07" clip-path="url(#tile)"/>
+<g filter="url(#lift)" stroke-linecap="round" stroke-linejoin="round">
+<path d="M14 80 L38 36 H58 L82 80 Z" fill="#16302a"/>
+<path d="M38 36 H58 L62 44 Q56 48 52 42 Q48 50 44 42 Q40 48 34 44 Z" fill="#f7c35f"/>
+<path d="M42 30 Q40 20 46 14 M54 30 Q58 22 54 12" stroke="#fff4e0" stroke-width="3.5" fill="none" opacity=".7"/>
+<circle cx="42" cy="62" r="2.6" fill="#fff4e0"/><circle cx="54" cy="62" r="2.6" fill="#fff4e0"/>
+<path d="M42 70 q6 5 12 0" stroke="#fff4e0" stroke-width="2.6" fill="none"/></g>
+</svg>

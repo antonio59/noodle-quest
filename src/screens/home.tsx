@@ -9,6 +9,7 @@ import { computeBonusTiers, getBonusTier } from '@/lib/bonus-multiplier';
 import { getRankTier, RANK_TIERS } from '@/lib/rank-tiers';
 import { WeeklyPuzzleCard } from '@/components/puzzles/WeeklyPuzzleCard';
 import { FamilyWeekCard } from '@/components/FamilyWeekCard';
+import { GameArt } from '@/components/GameArt';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -119,7 +120,7 @@ export function Home() {
             })}
             className="w-full flex items-center gap-3 bg-accent/8 hover:bg-accent/15 border border-accent/25 rounded-2xl px-4 py-3 text-left transition-all active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <span className="text-3xl flex-shrink-0" aria-hidden>{lastPlayedEntry.game!.emoji}</span>
+            <GameArt gameId={lastPlayedEntry.id} emoji={lastPlayedEntry.game!.emoji} size={44} />
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-bold text-accent uppercase tracking-widest">Continue playing</p>
               <p className="text-sm font-bold truncate">{lastPlayedEntry.game!.name} · Stage {lastPlayedEntry.lastStage}</p>
@@ -241,7 +242,7 @@ export function Home() {
                     </span>
                   )}
 
-                  <div className="text-3xl mb-2.5">{g.emoji}</div>
+                  <GameArt gameId={g.id} emoji={g.emoji} size={48} className="mb-2.5" />
                   <div className="font-bold text-sm text-text mb-0.5 pr-10 leading-tight min-h-9 line-clamp-2">{g.name}</div>
 
                   <div className="flex items-center justify-between mt-auto pt-2">
@@ -290,7 +291,7 @@ export function Home() {
                     onClick={() => navigate(`/play/${g.id}`, { state: { stage: 1 } })}
                     className="flex-shrink-0 w-28 bg-card hover:bg-card-hover rounded-2xl p-3.5 text-center border border-yellow-500/15 hover:border-yellow-500/30 transition-all active:scale-95"
                   >
-                    <div className="text-2xl mb-1.5">{g.emoji}</div>
+                    <GameArt gameId={g.id} emoji={g.emoji} size={44} className="mx-auto mb-1.5" />
                     <div className="text-xs font-semibold text-text truncate mb-1">{g.name}</div>
                     <div className="flex gap-0.5 justify-center mb-1.5">
                       {[1, 2, 3].map(i => (

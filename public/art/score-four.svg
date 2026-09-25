@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8073"/><stop offset="1" stop-color="#1f4d45"/></linearGradient>
+<filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.5" stdDeviation="0.6" flood-color="#0b1a16" flood-opacity=".35"/></filter>
+<clipPath id="tile"><rect width="96" height="96" rx="24"/></clipPath>
+</defs>
+<rect width="96" height="96" rx="24" fill="url(#bg)"/>
+<circle cx="18" cy="8" r="48" fill="#fff" opacity=".07" clip-path="url(#tile)"/>
+<g filter="url(#lift)" stroke-linecap="round" stroke-linejoin="round">
+<path d="M48 58 L82 68 L48 80 L14 68 Z" fill="#86c9f0"/>
+<rect x="26.5" y="22" width="3" height="44" rx="1.5" fill="#fff4e0"/><rect x="46.5" y="22" width="3" height="52" rx="1.5" fill="#fff4e0"/><rect x="66.5" y="22" width="3" height="44" rx="1.5" fill="#fff4e0"/>
+<ellipse cx="28" cy="59" rx="7.5" ry="6" fill="#ef6a55"/><ellipse cx="28" cy="47" rx="7.5" ry="6" fill="#f7c35f"/>
+<ellipse cx="48" cy="67" rx="7.5" ry="6" fill="#f7c35f"/><ellipse cx="48" cy="55" rx="7.5" ry="6" fill="#ef6a55"/><ellipse cx="48" cy="43" rx="7.5" ry="6" fill="#f7c35f"/>
+<ellipse cx="68" cy="59" rx="7.5" ry="6" fill="#ef6a55"/></g>
+</svg>

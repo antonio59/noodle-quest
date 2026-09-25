@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8073"/><stop offset="1" stop-color="#1f4d45"/></linearGradient>
+<filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.5" stdDeviation="0.6" flood-color="#0b1a16" flood-opacity=".35"/></filter>
+<clipPath id="tile"><rect width="96" height="96" rx="24"/></clipPath>
+</defs>
+<rect width="96" height="96" rx="24" fill="url(#bg)"/>
+<circle cx="18" cy="8" r="48" fill="#fff" opacity=".07" clip-path="url(#tile)"/>
+<g filter="url(#lift)" stroke-linecap="round" stroke-linejoin="round">
+<rect x="15" y="33" width="66" height="51" rx="6" fill="#f7c35f"/>
+<rect x="18" y="36" width="15" height="15" rx="0" fill="#fff4e0"/><rect x="33" y="36" width="15" height="15" rx="0" fill="#16302a"/><rect x="48" y="36" width="15" height="15" rx="0" fill="#fff4e0"/><rect x="63" y="36" width="15" height="15" rx="0" fill="#16302a"/><rect x="18" y="51" width="15" height="15" rx="0" fill="#16302a"/><rect x="33" y="51" width="15" height="15" rx="0" fill="#fff4e0"/><rect x="48" y="51" width="15" height="15" rx="0" fill="#16302a"/><rect x="63" y="51" width="15" height="15" rx="0" fill="#fff4e0"/><rect x="18" y="66" width="15" height="15" rx="0" fill="#fff4e0"/><rect x="33" y="66" width="15" height="15" rx="0" fill="#16302a"/><rect x="48" y="66" width="15" height="15" rx="0" fill="#fff4e0"/><rect x="63" y="66" width="15" height="15" rx="0" fill="#16302a"/>
+<ellipse cx="38" cy="47" rx="12" ry="8" fill="#a8412f"/><ellipse cx="38" cy="44" rx="12" ry="8" fill="#ef6a55"/><ellipse cx="38" cy="44" rx="7" ry="4.5" fill="none" stroke="#fff4e0" stroke-opacity=".55" stroke-width="1.5"/>
+<ellipse cx="60" cy="69" rx="12" ry="8" fill="#c9b89a"/><ellipse cx="60" cy="66" rx="12" ry="8" fill="#fff4e0"/><ellipse cx="60" cy="66" rx="7" ry="4.5" fill="none" stroke="#fff4e0" stroke-opacity=".55" stroke-width="1.5"/>
+<ellipse cx="60" cy="60" rx="12" ry="8" fill="#c9b89a"/><ellipse cx="60" cy="57" rx="12" ry="8" fill="#fff4e0"/><ellipse cx="60" cy="57" rx="7" ry="4.5" fill="none" stroke="#fff4e0" stroke-opacity=".55" stroke-width="1.5"/>
+<path d="M52 49 l2.5 -9 5.5 5 5.5 -5 2.5 9 z" fill="#f7c35f" stroke="#16302a" stroke-width="1.2"/></g>
+</svg>

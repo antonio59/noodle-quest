@@ -3,10 +3,10 @@
  * Conservative caching strategy so deploys are never stale:
  *  - navigations: network-first, falling back to the cached app shell
  *  - hashed build assets (/assets/*): cache-first (immutable by name)
- *  - dictionary + icons: stale-while-revalidate
+ *  - dictionary, icons + game art: stale-while-revalidate
  *  - everything else (Convex API, fonts, etc.): untouched
  */
-const CACHE = 'nq-v4';
+const CACHE = 'nq-v5';
 const APP_SHELL = '/index.html';
 
 self.addEventListener('install', (event) => {
@@ -63,7 +63,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Big static extras: serve from cache, refresh in the background.
-  if (url.pathname.startsWith('/dict/') || url.pathname.startsWith('/icons/') || url.pathname === '/favicon.svg') {
+  if (url.pathname.startsWith('/dict/') || url.pathname.startsWith('/icons/') || url.pathname.startsWith('/art/') || url.pathname === '/favicon.svg') {
     event.respondWith(
       caches.match(request).then((hit) => {
         const refresh = fetch(request)

@@ -27,6 +27,11 @@ export function registerAlias(alias: string, targetId: string) {
   aliases.set(alias, targetId);
 }
 
+/** Registered id for `id`, following URL aliases (e.g. word-search → wordsearch). */
+export function canonicalGameId(id: string): string {
+  return registry.has(id) ? id : aliases.get(id) ?? id;
+}
+
 function resolveEntry(id: string): GameEntry | undefined {
   return registry.get(id) ?? registry.get(aliases.get(id) ?? '');
 }

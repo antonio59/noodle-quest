@@ -7,6 +7,7 @@ import { getAllGames } from '@/lib/game-registry';
 import { GAME_CATEGORIES, type GameCategory } from '@/types';
 import { Heart, Search, Play, Pause, Wind, Star, Sparkles, Volume2, VolumeX, Moon, Smartphone, Globe, Puzzle as PuzzleIcon } from 'lucide-react';
 import { RequestGameModal } from '@/components/RequestGameModal';
+import { GameArt } from '@/components/GameArt';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { TRACKS } from '@/tracks/track-list';
 import { computeBonusTiers, getBonusTier } from '@/lib/bonus-multiplier';
@@ -226,7 +227,7 @@ export function GameHub() {
                     onClick={() => navigateToGame(g.id)}
                     className="bg-card hover:bg-card-hover rounded-xl p-3 text-center transition-all active:scale-95"
                   >
-                    <div className="text-2xl mb-1">{g.emoji}</div>
+                    <GameArt gameId={g.id} emoji={g.emoji} size={40} className="mx-auto mb-1.5" />
                     <div className="text-xs font-semibold truncate">{g.name}</div>
                   </button>
                 ))}
@@ -299,7 +300,7 @@ export function GameHub() {
                     className="w-full h-full flex flex-col items-center text-center pt-6 pb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-2xl"
                     aria-label={`Play ${g.name}`}
                   >
-                    <div className="text-5xl mb-3 leading-none">{g.emoji}</div>
+                    <GameArt gameId={g.id} emoji={g.emoji} size={64} className="mb-3" />
                     <div className="min-h-9 flex items-center justify-center mb-1">
                       <span className="font-bold text-sm leading-tight text-text line-clamp-2">{g.name}</span>
                     </div>
@@ -329,7 +330,7 @@ export function GameHub() {
                     onClick={() => navigate(`/play/${g.id}`, { state: { stage: 1, fromTab: g.category === 'board' ? 'board' : 'breathe' } })}
                     className="bg-card hover:bg-card-hover rounded-xl p-3 text-center transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
-                    <div className="text-2xl mb-1" aria-hidden>{g.emoji}</div>
+                    <GameArt gameId={g.id} emoji={g.emoji} size={40} className="mx-auto mb-1.5" />
                     <div className="text-xs font-semibold truncate">{g.name}</div>
                     <div className="text-[9px] text-text-muted capitalize">{g.category}</div>
                   </button>
@@ -405,7 +406,7 @@ export function GameHub() {
                       </span>
                     )}
 
-                    <div className="text-5xl mb-3 leading-none mt-2">{g.emoji}</div>
+                    <GameArt gameId={g.id} emoji={g.emoji} size={64} className="mb-3 mt-2" />
 
                     {/* Name + description */}
                     <div className="min-h-9 flex items-center justify-center mb-1">
@@ -475,9 +476,7 @@ export function GameHub() {
                   className={`w-full text-left bg-gradient-to-br ${th.from} border ${th.border} rounded-2xl p-5 cursor-pointer transition-all duration-200 active:scale-[0.98] ${th.glow}`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`w-14 h-14 rounded-2xl ${th.iconBg} border ${th.border} flex items-center justify-center text-3xl flex-shrink-0 animate-[breathe-pulse_4s_ease-in-out_infinite]`}>
-                      {g.emoji}
-                    </div>
+                    <GameArt gameId={g.id} emoji={g.emoji} size={56} className="animate-[breathe-pulse_4s_ease-in-out_infinite]" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <h3 className="font-bold text-base text-text">{g.name}</h3>

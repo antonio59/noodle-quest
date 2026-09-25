@@ -8,6 +8,7 @@ import { LogOut, Star, Gamepad2, Trophy, Zap, AlertTriangle, Pencil, Check, Chev
 import { feedbackEnabled, setFeedbackEnabled, playWin } from '@/lib/feedback';
 import { useNavigate } from 'react-router-dom';
 import { getRankTier, RANK_TIERS } from '@/lib/rank-tiers';
+import { GameArt } from '@/components/GameArt';
 
 export function Profile() {
   const { player, logout, updateAvatar, updateName, updatePrefs } = useAuth();
@@ -233,7 +234,7 @@ export function Profile() {
               {topGames.map(({ id, game, starsEarned, highScore, timesPlayed }, idx) => (
                 <div key={id} className="flex items-center gap-3 px-4 py-3">
                   <span className="text-[10px] font-bold text-text-muted w-4 text-center">{idx + 1}</span>
-                  <span className="text-2xl flex-shrink-0">{game!.emoji}</span>
+                  <GameArt gameId={id} emoji={game!.emoji} size={36} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-text truncate">{game!.name}</p>
                     <div className="flex items-center gap-1 mt-0.5">

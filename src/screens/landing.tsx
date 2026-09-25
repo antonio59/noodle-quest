@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { getAllGames } from '@/lib/game-registry';
+import { GameArt } from '@/components/GameArt';
 import {
   Brain,
   Gamepad2,
@@ -72,22 +73,17 @@ export function Landing() {
       {/* Marquee of games */}
       <div className="pb-12 space-y-2 overflow-hidden select-none" aria-hidden>
         {[0, 1].map(row => {
-          const all = getAllGames().map(g => g.emoji);
+          const all = getAllGames();
           const half = Math.ceil(all.length / 2);
-          const emojis = row === 0 ? all.slice(0, half) : all.slice(half);
+          const games = row === 0 ? all.slice(0, half) : all.slice(half);
           return (
             <div
               key={row}
               className="flex w-max"
-              style={{ animation: `marquee ${emojis.length * 3.2}s linear infinite${row === 1 ? ' reverse' : ''}` }}
+              style={{ animation: `marquee ${games.length * 3.2}s linear infinite${row === 1 ? ' reverse' : ''}` }}
             >
-              {[...emojis, ...emojis].map((e, i) => (
-                <span
-                  key={i}
-                  className="flex items-center justify-center w-12 h-12 mx-1 text-2xl bg-card/80 border border-white/5 rounded-2xl flex-shrink-0"
-                >
-                  {e}
-                </span>
+              {[...games, ...games].map((g, i) => (
+                <GameArt key={i} gameId={g.id} emoji={g.emoji} size={56} className="mx-1" />
               ))}
             </div>
           );

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f8f5e"/><stop offset="1" stop-color="#22573a"/></linearGradient>
+<filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.5" stdDeviation="0.6" flood-color="#0b1a16" flood-opacity=".35"/></filter>
+<clipPath id="tile"><rect width="96" height="96" rx="24"/></clipPath>
+</defs>
+<rect width="96" height="96" rx="24" fill="url(#bg)"/>
+<circle cx="18" cy="8" r="48" fill="#fff" opacity=".07" clip-path="url(#tile)"/>
+<g filter="url(#lift)" stroke-linecap="round" stroke-linejoin="round">
+<path d="M28 60 H68 L63 82 H33 Z" fill="#ef6a55"/>
+<rect x="25" y="56" width="46" height="8" rx="3" fill="#c55644"/>
+<path d="M48 58 V34" stroke="#62d9a0" stroke-width="4"/>
+<path d="M48 44 C36 44 26 38 24 26 C38 26 46 32 48 44 Z" fill="#62d9a0"/>
+<path d="M48 38 C58 36 68 28 70 16 C56 18 50 26 48 38 Z" fill="#62d9a0"/>
+<circle cx="48" cy="70" r="2.2" fill="#fff4e0"/></g>
+</svg>
