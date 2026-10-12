@@ -18,7 +18,7 @@ pnpm:
 #   baseline-browser-mapping ^2.11.0  CVE-2026-45819 (process.exit DoS)
 #   browserslist            ^4.28.7   CVE-2026-73088 / CVE-2026-73089
 #   postcss                 ^8.5.23   CVE-2026-73646 / CVE-2026-69153
-#   brace-expansion         ^5.0.9    CVE-2026-13149 / CVE-2026-14257 / CVE-2026-69152
+#   brace-expansion         ^5.0.12   CVE-2026-102276 / CVE-2026-102277 / CVE-2026-102278
 #   nanoid                  ^3.3.18   CVE-2026-67213 / CVE-2026-67214
 #   vitest / @vitest/mocker ^4.1.11   CVE-2026-84373 (path traversal)
 overrides:
@@ -30,7 +30,7 @@ overrides:
   baseline-browser-mapping: "^2.11.0"
   browserslist: "^4.28.7"
   postcss: "^8.5.23"
-  brace-expansion: "^5.0.9"
+  brace-expansion: "^5.0.12"
   nanoid: "^3.3.18"
   vitest: "^4.1.11"
   "@vitest/mocker": "^4.1.11"
