@@ -5,6 +5,34 @@ import type { Id } from "./_generated/dataModel";
 import { playerFromSession } from "./model/auth";
 import { assertAdminSecret } from "./model/admin";
 
+const MAX_ERROR_ID = 120;
+const MAX_GAME_ID = 60;
+const MAX_PLAYER_NAME = 60;
+const MAX_ERROR_TYPE = 40;
+const MAX_SEVERITY = 20;
+const MAX_MESSAGE = 2000;
+const MAX_STACK = 8000;
+const MAX_CONTEXT_JSON = 4000;
+/** Stack traces and client context are not kept forever. */
+export const REPORT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+function cap(value: string | undefined, max: number): string | undefined {
+  if (value === undefined) return undefined;
+  return value.slice(0, max);
+}
+
+function capContext(context: unknown): unknown {
+  if (context === undefined) return undefined;
+  try {
+    const json = JSON.stringify(context);
+    if (json === undefined) return undefined;
+    if (json.length <= MAX_CONTEXT_JSON) return context;
+    return json.slice(0, MAX_CONTEXT_JSON);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Strip fields that must not leave the server for browser admin UIs. */
 function stripReportForBrowser<T extends { stackTrace?: string; context?: unknown }>(report: T) {
   const { stackTrace: _st, context: _ctx, ...safe } = report;
@@ -45,11 +73,12 @@ interface ReportInput {
 
 async function upsertReport(ctx: MutationCtx, input: ReportInput) {
   const now = Date.now();
+  const errorId = cap(input.errorId, MAX_ERROR_ID) ?? "";
 
   // Check if this error already exists
   const existing = await ctx.db
     .query("reports")
-    .withIndex("by_errorId", (q) => q.eq("errorId", input.errorId))
+    .withIndex("by_errorId", (q) => q.eq("errorId", errorId))
     .first();
 
   if (existing) {
@@ -62,15 +91,15 @@ async function upsertReport(ctx: MutationCtx, input: ReportInput) {
   }
 
   const reportId = await ctx.db.insert("reports", {
-    errorId: input.errorId,
-    gameId: input.gameId,
+    errorId,
+    gameId: cap(input.gameId, MAX_GAME_ID),
     playerId: input.playerId,
-    playerName: input.playerName,
-    errorType: input.errorType,
-    severity: input.severity,
-    message: input.message,
-    stackTrace: input.stackTrace,
-    context: input.context,
+    playerName: cap(input.playerName, MAX_PLAYER_NAME),
+    errorType: cap(input.errorType, MAX_ERROR_TYPE) ?? "runtime",
+    severity: cap(input.severity, MAX_SEVERITY) ?? "medium",
+    message: cap(input.message, MAX_MESSAGE) ?? "",
+    stackTrace: cap(input.stackTrace, MAX_STACK),
+    context: capContext(input.context),
     status: "open",
     createdAt: now,
     updatedAt: now,
@@ -95,14 +124,14 @@ export const createReport = mutation({
   handler: async (ctx, args) => {
     const player = args.sessionToken ? await playerFromSession(ctx, args.sessionToken) : null;
     return await upsertReport(ctx, {
-      errorId: args.errorId.slice(0, 120),
+      errorId: args.errorId,
       gameId: args.gameId,
       playerId: player?._id,
       playerName: player?.name,
       errorType: args.errorType,
       severity: args.severity,
-      message: args.message.slice(0, 2000),
-      stackTrace: args.stackTrace?.slice(0, 8000),
+      message: args.message,
+      stackTrace: args.stackTrace,
       context: args.context,
     });
   },
@@ -124,6 +153,26 @@ export const createReportFromWebhook = internalMutation({
   },
   handler: async (ctx, args) => {
     return await upsertReport(ctx, args);
+  },
+});
+
+// Delete reports past the retention window, including stack traces and context.
+export const purgeOldReports = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - REPORT_RETENTION_MS;
+    let deleted = 0;
+    while (deleted < 500) {
+      const old = await ctx.db
+        .query("reports")
+        .withIndex("by_created", q => q.lt("createdAt", cutoff))
+        .take(100);
+      if (old.length === 0) break;
+      for (const report of old) await ctx.db.delete(report._id);
+      deleted += old.length;
+      if (old.length < 100) break;
+    }
+    return { deleted };
   },
 });
 

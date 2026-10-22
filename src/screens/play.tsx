@@ -42,6 +42,7 @@ export function PlayGame() {
   const [message, setMessage] = useState('');
   const [ended, setEnded] = useState<GameResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [scoreSaved, setScoreSaved] = useState(false);
   const [nextStage, setNextStage] = useState<number | null>(null);
   const [numPlayers, setNumPlayers] = useState<number>(2);
   const [lobbyDone, setLobbyDone] = useState(false);
@@ -484,31 +485,34 @@ export function PlayGame() {
 
     setEnded(finalResult);
     setSaving(true);
+    setScoreSaved(false);
 
     if (result.stars >= 3) playPerfect();
     else if (result.stars >= 2) playWin();
     else playLose();
 
+    let savedOk = false;
     if (player && saveScore) {
       try {
-        await saveScore({
+        const saved = await saveScore({
           sessionToken: player.sessionToken,
           gameId,
           stage: currentStage,
           score: finalScore,
           stars: result.stars,
         });
+        savedOk = !!saved && 'ok' in saved && saved.ok === true;
       } catch (err) {
         // save failed silently
       }
     }
-    // Resolve a pending challenge with this score
-    if (challengeId && player) {
+    setScoreSaved(savedOk);
+    // Resolve a pending challenge from the score row just stored for this stage.
+    if (challengeId && player && savedOk && currentStage === stage) {
       try {
         const res = await respondToChallenge({
           sessionToken: player.sessionToken,
           challengeId: challengeId as never,
-          toScore: finalScore,
         });
         if (res && 'won' in res) setChallengeOutcome(res.won ? 'won' : 'lost');
       } catch {
@@ -680,10 +684,11 @@ export function PlayGame() {
           </div>
 
           {/* Challenge a player with this score */}
-          {!isMultiplayer && !challengeId && ended.score > 0 && player && (
+          {!isMultiplayer && !challengeId && scoreSaved && ended.score > 0 && player && (
             <button
               onClick={() => setShowChallengeModal(true)}
-              className="w-full flex items-center justify-center gap-1.5 bg-card hover:bg-card-hover text-accent font-bold py-2.5 rounded-2xl border border-accent/30 transition-colors active:scale-95 text-sm mb-1"
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-1.5 bg-card hover:bg-card-hover text-accent font-bold py-2.5 rounded-2xl border border-accent/30 transition-colors active:scale-95 text-sm mb-1 disabled:opacity-50"
             >
               <Swords size={14} aria-hidden /> Challenge a player
             </button>
@@ -738,9 +743,9 @@ export function PlayGame() {
           </div>
         ) : (
         <button
-          onClick={() => maxUnlocked > 1 && setShowStagePicker(!showStagePicker)}
+          onClick={() => !challengeId && maxUnlocked > 1 && setShowStagePicker(!showStagePicker)}
           className="text-center px-2 py-1 rounded-lg hover:bg-card/40 transition-colors"
-          aria-label={maxUnlocked > 1 ? 'Change stage' : 'Stage selector'}
+          aria-label={!challengeId && maxUnlocked > 1 ? 'Change stage' : 'Stage selector'}
         >
           <div className="font-semibold text-sm">{gameMeta.emoji} {gameMeta.name}</div>
           <div className="text-text-muted text-xs flex items-center justify-center gap-1">
@@ -751,7 +756,7 @@ export function PlayGame() {
             <ChevronDown
               size={12}
               className={`transition-transform ${
-                maxUnlocked > 1 ? 'opacity-80' : 'opacity-25'
+                !challengeId && maxUnlocked > 1 ? 'opacity-80' : 'opacity-25'
               } ${showStagePicker ? 'rotate-180' : ''}`}
             />
           </div>
@@ -770,7 +775,7 @@ export function PlayGame() {
         </div>
       </div>
 
-      {showStagePicker && maxUnlocked > 1 && (
+      {showStagePicker && maxUnlocked > 1 && !challengeId && (
         <div className="bg-surface border-b border-white/5 p-2 flex-shrink-0">
           <div className="flex gap-1 flex-wrap justify-center">
             {Array.from({ length: gameMeta.stages }, (_, i) => i + 1).map(s => {

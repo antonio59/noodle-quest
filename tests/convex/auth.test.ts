@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
+import { ANON_SIGNUP_LIMIT } from "../../convex/auth";
 import { setup, approvedPlayer } from "./setup";
 
 const NAME = "Tester";
@@ -46,6 +47,107 @@ describe("signUp", () => {
     });
     expect(res.pending).toBe(true);
     expect(res.sessionToken).toBeUndefined();
+  });
+
+  test("an invite code auto-approves one signup, then that player can join", async () => {
+    const t = setup();
+    const host = await approvedPlayer(t, "Host");
+    const invite = await t.mutation(api.multiplayer.createInvite, {
+      gameId: "chess", sessionToken: host.sessionToken,
+    });
+    const first = await t.mutation(api.auth.signUp, {
+      name: "Guest", pin: PIN, inviteCode: invite.inviteCode,
+    });
+    expect(first.sessionToken).toBeDefined();
+    const row = await t.run(async ctx =>
+      ctx.db.query("multiplayer_invites").withIndex("by_code", q => q.eq("inviteCode", invite.inviteCode!)).unique(),
+    );
+    expect(row!.toId).toBeUndefined();
+    expect(row!.signupRedeemedAt).toEqual(expect.any(Number));
+    expect(row!.status).toBe("pending");
+
+    const second = await t.mutation(api.auth.signUp, {
+      name: "Copycat", pin: PIN, inviteCode: invite.inviteCode,
+    });
+    expect(second.pending).toBe(true);
+    expect(second.sessionToken).toBeUndefined();
+
+    const join = await t.mutation(api.multiplayer.joinSession, {
+      inviteCode: invite.inviteCode!, sessionToken: first.sessionToken!,
+    });
+    expect(join.sessionId).toBe(invite.sessionId);
+  });
+
+  test("redeeming a signup does not lock the rest of the lobby out", async () => {
+    const t = setup();
+    const host = await approvedPlayer(t, "Host");
+    const friend = await approvedPlayer(t, "Friend");
+    const invite = await t.mutation(api.multiplayer.createInvite, {
+      gameId: "ludo", sessionToken: host.sessionToken, maxPlayers: 4,
+    });
+    const guest = await t.mutation(api.auth.signUp, {
+      name: "Guest", pin: PIN, inviteCode: invite.inviteCode,
+    });
+    expect(guest.sessionToken).toBeDefined();
+    const guestJoin = await t.mutation(api.multiplayer.joinSession, {
+      inviteCode: invite.inviteCode!, sessionToken: guest.sessionToken!,
+    });
+    expect(guestJoin.sessionId).toBe(invite.sessionId);
+    const friendJoin = await t.mutation(api.multiplayer.joinSession, {
+      inviteCode: invite.inviteCode!, sessionToken: friend.sessionToken,
+    });
+    expect(friendJoin.error).toBeUndefined();
+    expect(friendJoin.sessionId).toBe(invite.sessionId);
+    const declined = await t.mutation(api.multiplayer.declineInvite, {
+      inviteCode: invite.inviteCode!, sessionToken: guest.sessionToken!,
+    });
+    expect(declined.error).toBe("You can't decline this invite.");
+  });
+
+  test("a direct invite or an unapproved inviter does not auto-approve", async () => {
+    const t = setup();
+    const host = await approvedPlayer(t, "Host");
+    const target = await approvedPlayer(t, "Target");
+    const direct = await t.mutation(api.multiplayer.createInvite, {
+      gameId: "chess", sessionToken: host.sessionToken, toId: target.playerId,
+    });
+    const viaDirect = await t.mutation(api.auth.signUp, {
+      name: "Stranger", pin: PIN, inviteCode: direct.inviteCode,
+    });
+    expect(viaDirect.pending).toBe(true);
+
+    const open = await t.mutation(api.multiplayer.createInvite, {
+      gameId: "chess", sessionToken: host.sessionToken,
+    });
+    await t.run(async ctx => {
+      await ctx.db.patch(host.playerId, { status: "rejected" as const });
+    });
+    const viaRejected = await t.mutation(api.auth.signUp, {
+      name: "Late", pin: PIN, inviteCode: open.inviteCode,
+    });
+    expect(viaRejected.pending).toBe(true);
+    expect(viaRejected.sessionToken).toBeUndefined();
+  });
+
+  test("anonymous signups stop once the hourly cap is reached", async () => {
+    const t = setup();
+    const host = await approvedPlayer(t, "Host");
+    const invite = await t.mutation(api.multiplayer.createInvite, {
+      gameId: "chess", sessionToken: host.sessionToken,
+    });
+    await t.run(async ctx => {
+      const row = await ctx.db.query("rate_limits").withIndex("by_key", q => q.eq("key", "signup:anonymous")).unique();
+      expect(row).toBeTruthy();
+      await ctx.db.patch(row!._id, { windowStart: Date.now(), count: ANON_SIGNUP_LIMIT });
+    });
+    const blocked = await signUp(t, "Flood");
+    expect(blocked.error).toMatch(/Too many new accounts/);
+    expect(blocked.playerId).toBeUndefined();
+
+    const invited = await t.mutation(api.auth.signUp, {
+      name: "Guest", pin: PIN, inviteCode: invite.inviteCode,
+    });
+    expect(invited.sessionToken).toBeDefined();
   });
 
   test("never stores the plaintext PIN", async () => {
@@ -251,6 +353,36 @@ describe("getAllPlayers", () => {
     });
     const players = await t.query(api.auth.getAllPlayers, {});
     expect(players.map(p => p.name)).toEqual(["Approved"]);
+  });
+});
+
+describe("expireStaleSignups", () => {
+  test("deletes old pending and rejected signups that never played", async () => {
+    const t = setup();
+    const pending = await signUp(t, "Old Pending");
+    const rejected = await signUp(t, "Old Rejected");
+    const recent = await signUp(t, "Recent");
+    const played = await signUp(t, "Played");
+    const keeper = await approvedPlayer(t, "Keeper");
+    await t.run(async ctx => {
+      await ctx.db.patch(pending.playerId!, { createdAt: 1 });
+      await ctx.db.patch(rejected.playerId!, { status: "rejected" as const, createdAt: 1 });
+      await ctx.db.patch(played.playerId!, { status: "rejected" as const, createdAt: 1 });
+      await ctx.db.insert("scores", {
+        playerId: played.playerId!, gameId: "chess", stage: 1, score: 10, stars: 1, playedAt: 1,
+      });
+      await ctx.db.insert("sessions", {
+        playerId: pending.playerId!, token: "stale-token", createdAt: 1, expiresAt: 1,
+      });
+    });
+
+    const res = await t.mutation(internal.auth.expireStaleSignups, {});
+    expect(res.removed).toBe(2);
+    const names = (await t.run(async ctx => ctx.db.query("players").collect())).map(p => p.name).sort();
+    expect(names).toEqual(["Keeper", "Played", "Recent"]);
+    const sessions = await t.run(async ctx => ctx.db.query("sessions").collect());
+    expect(sessions.some(s => s.token === "stale-token")).toBe(false);
+    expect(keeper.playerId).toBeDefined();
   });
 });
 

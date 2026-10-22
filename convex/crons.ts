@@ -10,4 +10,16 @@ crons.weekly(
   internal.recap.sendWeeklyRecap,
 );
 
+crons.daily(
+  "expire stale signups",
+  { hourUTC: 4, minuteUTC: 15 },
+  internal.auth.expireStaleSignups,
+);
+
+crons.daily(
+  "purge old error reports",
+  { hourUTC: 4, minuteUTC: 30 },
+  internal.reports.purgeOldReports,
+);
+
 export default crons;

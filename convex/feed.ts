@@ -1,10 +1,20 @@
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { playerFromSession } from "./model/auth";
 import { isAllowedGiphyUrl } from "./model/giphy";
 import { PASS_AND_PLAY_GAMES, describeMatchNames, isValidSeatName } from "./model/matchSummary";
 
 const MAX_POST_LENGTH = 2000;
+
+// Chat-like rows from before a player joined stay hidden. gif_url is the
+// GIF type the composer writes; gif is the older alias.
+const HISTORY_GATED_TYPES = new Set(["chat", "gif", "gif_url", "sticker"]);
+
+function visibleToViewer(post: { type: string; createdAt: number }, viewerCreatedAt: number): boolean {
+  if (!HISTORY_GATED_TYPES.has(post.type)) return true;
+  return post.createdAt >= viewerCreatedAt;
+}
 
 const CLIENT_POST_TYPES = v.union(
   v.literal("chat"),
@@ -125,8 +135,25 @@ export const getFeed = query({
     const viewer = await playerFromSession(ctx, args.sessionToken);
     if (!viewer) return [];
     const limit = Math.min(args.limit ?? 50, 100);
-    const posts = await ctx.db.query("feed").withIndex("by_time").order("desc").take(limit);
-    return posts.map(p => ({ id: p._id, authorName: p.authorName, authorAvatar: p.authorAvatar, type: p.type, content: p.content, gameId: p.gameId, gameName: p.gameName, gameEmoji: p.gameEmoji, stage: p.stage, stars: p.stars, createdAt: p.createdAt }));
+    // Walk newest-first until the page is full of rows this viewer may see.
+    // Filtering after a single take() would let old chat crowd out scores.
+    const visible: Doc<"feed">[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 8 && visible.length < limit; page++) {
+      const result = await ctx.db
+        .query("feed")
+        .withIndex("by_time")
+        .order("desc")
+        .paginate({ numItems: 50, cursor });
+      for (const post of result.page) {
+        if (!visibleToViewer(post, viewer.createdAt)) continue;
+        visible.push(post);
+        if (visible.length >= limit) break;
+      }
+      if (result.isDone) break;
+      cursor = result.continueCursor;
+    }
+    return visible.map(p => ({ id: p._id, authorName: p.authorName, authorAvatar: p.authorAvatar, type: p.type, content: p.content, gameId: p.gameId, gameName: p.gameName, gameEmoji: p.gameEmoji, stage: p.stage, stars: p.stars, createdAt: p.createdAt }));
   },
 });
 

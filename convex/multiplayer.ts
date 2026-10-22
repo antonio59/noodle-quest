@@ -148,6 +148,28 @@ function sanitizeBoardState(gameId: string, bs: unknown, viewerSeat: number | nu
   return state;
 }
 
+/** Hide private cards, racks, and draw piles inside one stored move. */
+function sanitizeStoredMove(gameId: string, entry: unknown, viewerSeat: number | null): unknown {
+  if (entry === null || typeof entry !== "object") return entry;
+  const record = entry as Record<string, unknown>;
+  let out: Record<string, unknown> = record;
+  if ("boardState" in record) {
+    out = { ...out, boardState: sanitizeBoardState(gameId, record.boardState, viewerSeat) };
+  }
+  const move = record.move;
+  if (move !== null && typeof move === "object" && "boardState" in (move as Record<string, unknown>)) {
+    const moveRecord = move as Record<string, unknown>;
+    out = {
+      ...out,
+      move: {
+        ...moveRecord,
+        boardState: sanitizeBoardState(gameId, moveRecord.boardState, viewerSeat),
+      },
+    };
+  }
+  return out;
+}
+
 // Create a multiplayer invite (link or direct)
 export const createInvite = mutation({
   args: {
@@ -468,7 +490,7 @@ export const getSession = query({
       currentPlayer: session.currentPlayer,
       status: session.status,
       winner: session.winner,
-      moves: session.moves,
+      moves: session.moves.map(m => sanitizeStoredMove(session.gameId, m, viewerSeat)),
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
     };

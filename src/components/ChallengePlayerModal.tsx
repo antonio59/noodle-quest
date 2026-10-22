@@ -42,7 +42,6 @@ export function ChallengePlayerModal({ gameId, gameName, stage, score, onClose }
         toId: toId as never,
         gameId,
         stage,
-        fromScore: score,
       });
       if (res && 'error' in res && res.error) {
         setError(res.error);

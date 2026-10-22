@@ -1,5 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import {
   hashPin,
@@ -14,7 +15,14 @@ import {
   LOCKOUT_MS,
 } from "./model/auth";
 import { assertAdminSecret } from "./model/admin";
+import { takeRateLimit } from "./model/rateLimit";
 import { internal } from "./_generated/api";
+
+/** Uninvited signups per hour, site-wide. There is no client IP in a mutation. */
+export const ANON_SIGNUP_LIMIT = 8;
+export const ANON_SIGNUP_WINDOW_MS = 60 * 60 * 1000;
+/** Pending and rejected signups with no play history are deleted after this. */
+export const SIGNUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Expanded avatar pool — must stay in sync with src/lib/avatars.ts
 const AVATARS = [
@@ -50,14 +58,31 @@ export const signUp = mutation({
     const existing = await findPlayerByName(ctx, name);
     if (existing) return { error: "Name already taken!" };
 
-    // A live multiplayer invite auto-approves — someone already vouched.
-    let invited = false;
+    // A live open invite auto-approves — someone already vouched. The code
+    // is single-use for signup: an approved inviter, no addressee yet, and
+    // not already redeemed. Joining the lobby is unchanged.
+    let redeemInviteId: Id<"multiplayer_invites"> | null = null;
     if (args.inviteCode) {
       const invite = await ctx.db
         .query("multiplayer_invites")
         .withIndex("by_code", q => q.eq("inviteCode", args.inviteCode!))
         .unique();
-      invited = !!invite && invite.status === "pending" && invite.expiresAt > Date.now();
+      if (
+        invite &&
+        invite.status === "pending" &&
+        invite.expiresAt > Date.now() &&
+        invite.toId === undefined &&
+        invite.signupRedeemedAt === undefined
+      ) {
+        const inviter = await ctx.db.get(invite.fromId);
+        const inviterApproved = !!inviter && (inviter.status === undefined || inviter.status === "approved");
+        if (inviterApproved) redeemInviteId = invite._id;
+      }
+    }
+
+    if (!redeemInviteId) {
+      const allowed = await takeRateLimit(ctx, "signup:anonymous", ANON_SIGNUP_LIMIT, ANON_SIGNUP_WINDOW_MS);
+      if (!allowed) return { error: "Too many new accounts right now. Try again in a little while." };
     }
 
     const avatar = args.avatar && AVATARS.includes(args.avatar)
@@ -67,7 +92,7 @@ export const signUp = mutation({
     const pinHash = await hashPin(args.pin, pinSalt);
     const now = Date.now();
 
-    if (invited) {
+    if (redeemInviteId) {
       const playerId = await ctx.db.insert("players", {
         name,
         pinHash,
@@ -79,6 +104,7 @@ export const signUp = mutation({
         createdAt: now,
         lastActive: now,
       });
+      await ctx.db.patch(redeemInviteId, { signupRedeemedAt: now });
       const sessionToken = await createSession(ctx, playerId);
       return { playerId, avatar, sessionToken, kidMode: false, theme: "dark" as const };
     }
@@ -105,6 +131,34 @@ export const signUp = mutation({
       approvalToken,
     });
     return { pending: true as const, playerId };
+  },
+});
+
+// Drop abandoned signup rows so the approval queue and rejected names
+// don't accumulate. Players who actually played are kept.
+export const expireStaleSignups = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - SIGNUP_RETENTION_MS;
+    let removed = 0;
+    for (const status of ["pending", "rejected"] as const) {
+      const rows = await ctx.db
+        .query("players")
+        .withIndex("by_status", q => q.eq("status", status))
+        .collect();
+      for (const player of rows) {
+        if (player.createdAt > cutoff) continue;
+        const [score, progress] = await Promise.all([
+          ctx.db.query("scores").withIndex("by_player", q => q.eq("playerId", player._id)).first(),
+          ctx.db.query("progress").withIndex("by_player", q => q.eq("playerId", player._id)).first(),
+        ]);
+        if (score || progress) continue;
+        await deleteSessionsForPlayer(ctx, player._id);
+        await ctx.db.delete(player._id);
+        removed++;
+      }
+    }
+    return { removed };
   },
 });
 

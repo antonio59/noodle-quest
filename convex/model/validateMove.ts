@@ -42,36 +42,80 @@ function rejectForeignWinner(winner: unknown, seat: Seat): string | null {
   return null;
 }
 
-/** Connect Four: 6×7 board of null | 'red' | 'yellow'. */
+type ConnectCell = "red" | "yellow" | null;
+type ConnectBoard = ConnectCell[][];
+
+function isConnectFourBoard(board: unknown): board is ConnectBoard {
+  if (!Array.isArray(board) || board.length !== 6) return false;
+  for (const row of board) {
+    if (!Array.isArray(row) || row.length !== 7) return false;
+    for (const cell of row) {
+      if (cell !== null && cell !== "red" && cell !== "yellow") return false;
+    }
+  }
+  return true;
+}
+
+function emptyConnectFour(): ConnectBoard {
+  return Array.from({ length: 6 }, () => Array<ConnectCell>(7).fill(null));
+}
+
+/** Previous position, or an empty board when none has been stored yet. */
+function previousConnectFour(prev: unknown): ConnectBoard | null {
+  if (!prev || typeof prev !== "object" || !("board" in prev) || (prev as { board?: unknown }).board == null) {
+    return emptyConnectFour();
+  }
+  const board = (prev as { board?: unknown }).board;
+  return isConnectFourBoard(board) ? board : null;
+}
+
+/**
+ * Exactly one disc of `color`, placed in the lowest empty cell of a column.
+ * Row 0 is the top; gravity fills toward row 5.
+ */
+function isOneGravityDrop(prev: ConnectBoard, next: ConnectBoard, color: ConnectCell): boolean {
+  let placed: { r: number; c: number } | null = null;
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 7; c++) {
+      if (prev[r][c] === next[r][c]) continue;
+      if (prev[r][c] !== null || next[r][c] !== color) return false;
+      if (placed) return false;
+      placed = { r, c };
+    }
+  }
+  if (!placed) return false;
+  for (let r = placed.r + 1; r < 6; r++) {
+    if (prev[r][placed.c] === null) return false;
+  }
+  return true;
+}
+
+/** Connect Four: 6×7 board of null | 'red' | 'yellow', one gravity drop per move. */
 export function validateConnectFour(
   boardState: unknown,
   winner: unknown,
   seat: Seat,
+  opts: ValidateOpts = {},
 ): string | null {
   if (!boardState || typeof boardState !== "object") return "Missing board state.";
   const board = (boardState as { board?: unknown }).board;
-  if (!Array.isArray(board) || board.length !== 6) return "Invalid board.";
-  for (const row of board) {
-    if (!Array.isArray(row) || row.length !== 7) return "Invalid board.";
-    for (const cell of row) {
-      if (cell !== null && cell !== "red" && cell !== "yellow") return "Invalid cell.";
-    }
-  }
+  if (!isConnectFourBoard(board)) return "Invalid board.";
+  const previous = previousConnectFour(opts.previousBoardState);
+  if (!previous) return "Invalid board.";
+  const color: ConnectCell = seat === 1 ? "red" : "yellow";
+  if (!isOneGravityDrop(previous, board, color)) return "Move must be one legal drop.";
   const foreign = rejectForeignWinner(winner, seat);
   if (foreign) return foreign;
   if (winner === undefined) return null;
   if (winner === 0) {
-    const full = (board as (string | null)[][]).every(row => row.every(c => c !== null));
+    const full = board.every(row => row.every(c => c !== null));
     return full ? null : "Board is not full.";
   }
-  const color = seat === 1 ? "red" : "yellow";
-  if (!hasConnectFourWin(board as (string | null)[][], color)) {
-    return "Board does not show a win.";
-  }
+  if (!hasConnectFourWin(board, color)) return "Board does not show a win.";
   return null;
 }
 
-function hasConnectFourWin(board: (string | null)[][], color: string): boolean {
+function hasConnectFourWin(board: ConnectBoard, color: string): boolean {
   const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
   for (let r = 0; r < 6; r++) {
     for (let c = 0; c < 7; c++) {
@@ -171,7 +215,9 @@ export function validateTicTacToe(
   return null;
 }
 
-/** Chess: FEN + optional lastFrom/lastTo; checkmate/draw via chess.js. */
+const CHESS_START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+/** Chess: every move names lastFrom/lastTo from the stored FEN, or the start. */
 export function validateChess(
   boardState: unknown,
   winner: unknown,
@@ -194,29 +240,30 @@ export function validateChess(
   }
 
   const prev = opts.previousBoardState as { fen?: string } | null | undefined;
-  if (
-    prev &&
-    typeof prev.fen === "string" &&
-    typeof lastFrom === "string" &&
-    typeof lastTo === "string"
-  ) {
-    try {
-      const before = new Chess(prev.fen);
-      const expected = seat === 1 ? "w" : "b";
-      if (before.turn() !== expected) return "Not your turn on the board.";
-      const move = before.move({
-        from: lastFrom,
-        to: lastTo,
-        promotion: "q",
-      });
-      if (!move) return "Illegal chess move.";
-      // Compare piece placement + side to move (ignore clocks/ep nuances via board fen parts).
-      if (before.fen().split(" ").slice(0, 4).join(" ") !== fen.split(" ").slice(0, 4).join(" ")) {
-        return "Board does not match move.";
-      }
-    } catch {
-      return "Illegal chess move.";
+  const storedFen = prev && typeof prev.fen === "string" ? prev.fen.trim() : "";
+  // No stored position yet means this is move one, played from the standard
+  // start. A FEN on its own is not enough — lastFrom/lastTo are required
+  // either way, so a checkmate diagram cannot be written in as the first move.
+  const prevFen = storedFen || CHESS_START_FEN;
+  if (typeof lastFrom !== "string" || typeof lastTo !== "string" || !lastFrom || !lastTo) {
+    return "Move must include lastFrom and lastTo.";
+  }
+  try {
+    const before = new Chess(prevFen);
+    const expected = seat === 1 ? "w" : "b";
+    if (before.turn() !== expected) return "Not your turn on the board.";
+    const move = before.move({
+      from: lastFrom,
+      to: lastTo,
+      promotion: "q",
+    });
+    if (!move) return "Illegal chess move.";
+    // Compare piece placement + side to move (ignore clocks/ep nuances via board fen parts).
+    if (before.fen().split(" ").slice(0, 4).join(" ") !== fen.split(" ").slice(0, 4).join(" ")) {
+      return "Board does not match move.";
     }
+  } catch {
+    return "Illegal chess move.";
   }
 
   if (winner === undefined) return null;
@@ -668,7 +715,7 @@ export function validateMoveForGame(
   }
   switch (gameId) {
     case "connect-four":
-      return validateConnectFour(boardState, winner, seat);
+      return validateConnectFour(boardState, winner, seat, opts);
     case "score-four":
       return validateScoreFour(boardState, winner, seat);
     case "tic-tac-toe":
