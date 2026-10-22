@@ -31,6 +31,7 @@ export default defineSchema({
   })
     .index("by_name", ["name"])
     .index("by_approval", ["approvalToken"])
+    .index("by_status", ["status"])
     .searchIndex("search_name", { searchField: "name" }),
 
   // Auth sessions. A token is issued on signup/login and must accompany
@@ -144,6 +145,9 @@ export default defineSchema({
     inviteCode: v.string(),
     sessionId: v.optional(v.id("multiplayer_sessions")),
     status: v.string(), // 'pending' | 'accepted' | 'declined' | 'expired'
+    // Set when the code auto-approved one signup. The lobby can still be
+    // joined; the code just cannot approve a second account.
+    signupRedeemedAt: v.optional(v.number()),
     createdAt: v.number(),
     expiresAt: v.number(),
   })

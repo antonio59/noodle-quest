@@ -28,6 +28,69 @@ describe("createPost kid mode", () => {
   });
 });
 
+describe("getFeed history", () => {
+  test("drops chat, gif, and sticker rows from before the viewer joined", async () => {
+    const t = setup();
+    const elder = await signedUp(t, "Elder");
+    await t.mutation(api.feed.createPost, { sessionToken: elder.sessionToken, type: "chat", content: "old secret" });
+    await t.mutation(api.feed.createPost, {
+      sessionToken: elder.sessionToken,
+      type: "gif_url",
+      content: "https://media0.giphy.com/media/x/200w.gif",
+    });
+    await t.mutation(api.feed.createPost, { sessionToken: elder.sessionToken, type: "sticker", content: "happy" });
+    await t.mutation(api.games.saveScore, {
+      sessionToken: elder.sessionToken, gameId: "chess", stage: 1, score: 40, stars: 1,
+    });
+    await t.run(async ctx => {
+      const posts = await ctx.db.query("feed").collect();
+      for (const post of posts) await ctx.db.patch(post._id, { createdAt: 1 });
+      await ctx.db.insert("feed", {
+        authorId: elder.playerId,
+        authorName: "Elder",
+        authorAvatar: "🦊",
+        type: "gif",
+        content: "legacy-gif",
+        createdAt: 1,
+      });
+    });
+
+    const newbie = await signedUp(t, "Newbie");
+    await t.mutation(api.feed.createPost, { sessionToken: newbie.sessionToken, type: "chat", content: "hello now" });
+    const feed = await t.query(api.feed.getFeed, { sessionToken: newbie.sessionToken });
+    const contents = feed.map(p => p.content);
+    expect(contents).toContain("hello now");
+    expect(contents).toContain("⭐ on chess!");
+    expect(contents).not.toContain("old secret");
+    expect(contents).not.toContain("https://media0.giphy.com/media/x/200w.gif");
+    expect(contents).not.toContain("happy");
+    expect(contents).not.toContain("legacy-gif");
+  });
+
+  test("old chat does not crowd scores out of the page", async () => {
+    const t = setup();
+    const elder = await signedUp(t, "Elder");
+    await t.mutation(api.games.saveScore, {
+      sessionToken: elder.sessionToken, gameId: "chess", stage: 1, score: 40, stars: 1,
+    });
+    for (let i = 0; i < 55; i++) {
+      await t.mutation(api.feed.createPost, {
+        sessionToken: elder.sessionToken, type: "chat", content: `secret ${i}`,
+      });
+    }
+    await t.run(async ctx => {
+      const posts = await ctx.db.query("feed").collect();
+      for (const post of posts) {
+        await ctx.db.patch(post._id, { createdAt: post.type === "score" ? 1 : 2 });
+      }
+    });
+    const newbie = await signedUp(t, "Newbie");
+    const feed = await t.query(api.feed.getFeed, { sessionToken: newbie.sessionToken, limit: 50 });
+    expect(feed.map(p => p.content)).toContain("⭐ on chess!");
+    expect(feed.some(p => p.type === "chat")).toBe(false);
+  });
+});
+
 describe("postLocalMatch", () => {
   const share = (t: ReturnType<typeof setup>, sessionToken: string, over: Partial<{ gameId: string; seatNames: string[]; winnerSeat: number }> = {}) =>
     t.mutation(api.feed.postLocalMatch, { sessionToken, gameId: "chess", seatNames: ["Dad", "Mia"], winnerSeat: 2, ...over });

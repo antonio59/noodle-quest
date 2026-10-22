@@ -36,10 +36,13 @@ describe("recap.getFamilyWeek", () => {
       });
     });
     const challenge = await t.mutation(api.challenges.sendChallenge, {
-      sessionToken: mum.sessionToken, toId: mia.playerId, gameId: "chess", stage: 1, fromScore: 40,
+      sessionToken: mum.sessionToken, toId: mia.playerId, gameId: "chess", stage: 1,
+    });
+    await t.mutation(api.games.saveScore, {
+      sessionToken: mia.sessionToken, gameId: "chess", stage: 1, score: 90, stars: 1,
     });
     await t.mutation(api.challenges.respondToChallenge, {
-      sessionToken: mia.sessionToken, challengeId: challenge.challengeId!, toScore: 90,
+      sessionToken: mia.sessionToken, challengeId: challenge.challengeId!,
     });
     await t.mutation(api.puzzles.submitPuzzleTime, {
       sessionToken: mia.sessionToken, puzzleKey: weeklyPuzzleKey(Date.now()), seconds: 125,
@@ -54,14 +57,14 @@ describe("recap.getFamilyWeek", () => {
 
     const week = await t.query(api.recap.getFamilyWeek, { sessionToken: mum.sessionToken });
     expect(week).toMatchObject({
-      totalPlays: 3,
-      totalStars: 6,
-      topGame: { gameId: "chess", plays: 2 },
+      totalPlays: 4,
+      totalStars: 7,
+      topGame: { gameId: "chess", plays: 3 },
       challengeWins: [{ winner: "Mia", loser: "Mum", gameId: "chess" }],
       puzzleLeader: { name: "Mia", seconds: 125 },
     });
     expect(week!.players.map(p => [p.name, p.plays, p.stars, p.gamesTried])).toEqual([
-      ["Mia", 2, 5, 2],
+      ["Mia", 3, 6, 2],
       ["Mum", 1, 1, 1],
     ]);
   });

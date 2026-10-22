@@ -127,6 +127,14 @@ describe("multiplayer", () => {
       move: { boardState: { board } },
     });
     expect(move.ok).toBe(true);
+
+    const floating = Array.from({ length: 6 }, () => Array(7).fill(null));
+    floating[0][0] = "yellow";
+    const cheat = await t.mutation(api.multiplayer.makeMove, {
+      sessionId: join.sessionId!, sessionToken: guest.sessionToken,
+      move: { boardState: { board: floating } },
+    });
+    expect(cheat.error).toBe("Move must be one legal drop.");
   });
 
   test("only the invitee can decline a direct invite", async () => {

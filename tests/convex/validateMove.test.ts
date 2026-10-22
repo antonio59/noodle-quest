@@ -26,10 +26,32 @@ import {
 } from '../../convex/model/gameRules';
 
 describe('validateMove', () => {
-  it('accepts a connect-four win for the mover', () => {
-    const board = Array.from({ length: 6 }, () => Array(7).fill(null));
-    for (let c = 0; c < 4; c++) board[5][c] = 'red';
-    expect(validateConnectFour({ board }, 1, 1)).toBeNull();
+  it('accepts a connect-four win that is one gravity drop', () => {
+    const prev = Array.from({ length: 6 }, () => Array(7).fill(null));
+    prev[5][0] = 'red';
+    prev[5][1] = 'red';
+    prev[5][2] = 'red';
+    const board = prev.map(row => [...row]);
+    board[5][3] = 'red';
+    expect(validateConnectFour({ board }, 1, 1, { previousBoardState: { board: prev } })).toBeNull();
+  });
+
+  it('rejects a connect-four position that is not one legal drop', () => {
+    const empty = () => Array.from({ length: 6 }, () => Array(7).fill(null));
+    const floating = empty();
+    floating[0][0] = 'red';
+    expect(validateConnectFour({ board: floating }, undefined, 1)).toBe('Move must be one legal drop.');
+
+    const two = empty();
+    two[5][0] = 'red';
+    two[5][1] = 'red';
+    expect(validateConnectFour({ board: two }, undefined, 1)).toBe('Move must be one legal drop.');
+
+    const prev = empty();
+    prev[5][0] = 'red';
+    const replaced = prev.map(row => [...row]);
+    replaced[5][0] = 'yellow';
+    expect(validateConnectFour({ board: replaced }, undefined, 2, { previousBoardState: { board: prev } })).toBe('Move must be one legal drop.');
   });
 
   it('rejects a connect-four win claim without a line', () => {
@@ -86,9 +108,45 @@ describe('validateChess', () => {
   });
 
   it('rejects checkmate claim on a quiet position', () => {
+    const before = new Chess();
+    before.move({ from: 'e2', to: 'e4' });
     expect(
-      validateChess({ fen: new Chess().fen() }, 1, 1),
+      validateChess(
+        { fen: before.fen(), lastFrom: 'e2', lastTo: 'e4' },
+        1,
+        1,
+      ),
     ).toBe('Board does not show checkmate.');
+  });
+
+  it('rejects a checkmate diagram dropped in as the first move', () => {
+    expect(
+      validateChess(
+        { fen: '7k/6Q1/5K2/8/8/8/8/8 b - - 0 1' },
+        1,
+        1,
+      ),
+    ).toBe('Move must include lastFrom and lastTo.');
+    expect(
+      validateChess(
+        { fen: '7k/6Q1/5K2/8/8/8/8/8 b - - 0 1', lastFrom: 'e2', lastTo: 'e4' },
+        1,
+        1,
+      ),
+    ).toBe('Board does not match move.');
+  });
+
+  it('requires lastFrom and lastTo once a FEN is stored', () => {
+    const before = new Chess();
+    before.move({ from: 'e2', to: 'e4' });
+    expect(
+      validateChess(
+        { fen: before.fen() },
+        undefined,
+        2,
+        { previousBoardState: { fen: new Chess().fen() } },
+      ),
+    ).toBe('Move must include lastFrom and lastTo.');
   });
 });
 

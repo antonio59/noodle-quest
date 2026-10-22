@@ -4,9 +4,9 @@ import { api } from "../../convex/_generated/api";
 import { setup, approvedPlayer as signedUpPlayer } from "./setup";
 import { applyCubeMove, newCube, snlResolve } from "../../convex/model/gameRules";
 
-async function startGame(t: ReturnType<typeof setup>, gameId: string) {
-  const host = await signedUpPlayer(t, "Host");
-  const guest = await signedUpPlayer(t, "Guest");
+async function startGame(t: ReturnType<typeof setup>, gameId: string, names: [string, string] = ["Host", "Guest"]) {
+  const host = await signedUpPlayer(t, names[0]);
+  const guest = await signedUpPlayer(t, names[1]);
   const invite = await t.mutation(api.multiplayer.createInvite, { gameId, sessionToken: host.sessionToken });
   const join = await t.mutation(api.multiplayer.joinSession, {
     inviteCode: invite.inviteCode!, sessionToken: guest.sessionToken,
@@ -459,6 +459,58 @@ describe("bingo shared call clock", () => {
       move: { boardState: { called }, winner: 1 },
     });
     expect(gift.error).toBe("Not your turn.");
+  });
+});
+
+describe("getSession move history", () => {
+  test("hides opponent UNO hands and Scrabble racks inside stored moves", async () => {
+    const t = setup();
+    const uno = await startGame(t, "uno");
+    const card = (id: number) => ({ id, color: "red", symbol: "5", type: "number" });
+    await t.run(async ctx => {
+      await ctx.db.patch(uno.sessionId, {
+        moves: [{
+          player: 1,
+          at: 1,
+          move: {
+            boardState: {
+              hands: { "1": [card(1)], "2": [card(2)] },
+              deck: [card(3)],
+            },
+          },
+        }],
+      });
+    });
+    const guestView = await t.query(api.multiplayer.getSession, {
+      sessionId: uno.sessionId, sessionToken: uno.guest.sessionToken,
+    });
+    const guestBoard = (guestView!.moves[0] as any).move.boardState;
+    expect(guestBoard.hands["1"][0].hidden).toBe(true);
+    expect(guestBoard.hands["2"][0].id).toBe(2);
+    expect(guestBoard.deck[0].hidden).toBe(true);
+
+    const spectator = await t.query(api.multiplayer.getSession, { sessionId: uno.sessionId });
+    const hidden = (spectator!.moves[0] as any).move.boardState;
+    expect(hidden.hands["1"][0].hidden).toBe(true);
+    expect(hidden.hands["2"][0].hidden).toBe(true);
+
+    const scrabble = await startGame(t, "scrabble", ["Host Two", "Guest Two"]);
+    await t.run(async ctx => {
+      await ctx.db.patch(scrabble.sessionId, {
+        moves: [{
+          player: 1,
+          at: 1,
+          move: { boardState: { racks: [["Q", "Z"], ["A", "E"]], pool: ["T", "S"] } },
+        }],
+      });
+    });
+    const hostView = await t.query(api.multiplayer.getSession, {
+      sessionId: scrabble.sessionId, sessionToken: scrabble.host.sessionToken,
+    });
+    const racks = (hostView!.moves[0] as any).move.boardState;
+    expect(racks.racks[0]).toEqual(["Q", "Z"]);
+    expect(racks.racks[1]).toEqual([null, null]);
+    expect(racks.pool).toEqual([null, null]);
   });
 });
 
