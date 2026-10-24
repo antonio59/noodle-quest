@@ -232,12 +232,13 @@ That command deploys Convex only on `main`. Pull-request builds set
 frontend build when `CONVEX_DEPLOY_KEY` is a production key. The wrapper at
 `scripts/pages-convex-deploy.mjs` (installed over `npx convex` on
 `postinstall`) runs `npm run build` for those previews and leaves production
-alone. Node is pinned to 22.16.0 in `.node-version` / `.nvmrc` because
-pnpm 11.1.1 requires Node >=22.13; set `NODE_VERSION` on the Pages
+alone. Node is pinned to 22.23.4 in `.node-version` / `.nvmrc` because
+pnpm 11.1.1 requires Node >=22.13 and CVE-2026-111497 (Brotli decoder
+RCE) is fixed in 22.23.4; set `NODE_VERSION` on the Pages
 **preview** environment as well as production if the dashboard value should win.
 
 SPA fallback and security headers live in `public/_redirects` and
-`public/_headers`. Pages build env vars: `NODE_VERSION=22`,
+`public/_headers`. Pages build env vars: `NODE_VERSION=22.23.4`,
 `VITE_CONVEX_URL`, `CONVEX_DEPLOY_KEY` (secret).
 
 Manual deploys:
