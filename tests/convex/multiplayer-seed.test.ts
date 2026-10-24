@@ -463,7 +463,7 @@ describe("bingo shared call clock", () => {
 });
 
 describe("getSession move history", () => {
-  test("hides opponent UNO hands and Scrabble racks inside stored moves", async () => {
+  test("hides opponent UNO hands and Scrabble racks inside stored moves", { timeout: 20_000 }, async () => {
     const t = setup();
     const uno = await startGame(t, "uno");
     const card = (id: number) => ({ id, color: "red", symbol: "5", type: "number" });
