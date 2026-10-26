@@ -463,7 +463,10 @@ describe("bingo shared call clock", () => {
 });
 
 describe("getSession move history", () => {
-  test("hides opponent UNO hands and Scrabble racks inside stored moves", async () => {
+  // Two startGame() calls are four approved players, eight PIN hashes at
+  // 10k SHA-256 iterations each. The 5s default fails once the suite is
+  // running in parallel (same cause as the lockout test in auth.test.ts).
+  test("hides opponent UNO hands and Scrabble racks inside stored moves", { timeout: 20000 }, async () => {
     const t = setup();
     const uno = await startGame(t, "uno");
     const card = (id: number) => ({ id, color: "red", symbol: "5", type: "number" });
