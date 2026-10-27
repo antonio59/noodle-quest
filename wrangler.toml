@@ -4,12 +4,12 @@
 # environment variables are still configured in the Pages dashboard:
 #   Build command:  npx convex deploy --cmd 'npm run build'
 #   Output dir:     dist
-#   Env vars:       NODE_VERSION=22, VITE_CONVEX_URL, CONVEX_DEPLOY_KEY (secret)
+#   Env vars:       NODE_VERSION=22.23.4, VITE_CONVEX_URL, CONVEX_DEPLOY_KEY (secret)
 # Preview builds (any branch other than main) compile the frontend only.
 # Convex 1.38 rejects a production deploy key in that environment; see
-# scripts/pages-convex-deploy.mjs. Node is pinned in .node-version because
-# pnpm 11.1.1 requires >=22.13 and Pages preview does not inherit production
-# NODE_VERSION.
+# scripts/pages-convex-deploy.mjs. Node is pinned to 22.23.4 in .node-version
+# (CVE-2026-111497). pnpm 11.1.1 requires >=22.13 and Pages preview does not
+# inherit production NODE_VERSION.
 name = "noodle-quest"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-05-01"
