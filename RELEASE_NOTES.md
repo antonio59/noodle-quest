@@ -1,5 +1,53 @@
 # Release Notes — Noodle Quest
 
+## 1.3.1 — 27 October 2026
+
+A behind-the-scenes safety update; nothing changes in how you play.
+
+- Invite links now approve one new signup without locking anyone else out, and online board-game moves (Connect Four and Chess) are checked by the server
+- Game history, the family feed and reports are tightened so each person only sees what they should, and anonymous signups are rate-limited
+- Challenge scores are worked out from saved results, so they can't be faked
+- Security and dependency updates, including Node.js 22.23.4 and the build and test tools
+
+---
+
+## 1.3 — 25 September 2026
+
+Our biggest family-night update yet: pass one tablet around the sofa for nine classic board games, solve or build family puzzles together, play Tetris and 2048, and look back on the week every Sunday.
+
+### 🛋️ Pass & Play on one device
+
+Nine board games — **Checkers, Chess, Connect Four, Ludo, Scrabble, Score Four, Snakes & Ladders, Tic-Tac-Toe, and UNO** — now work for 2–4 people sharing one screen. Pick seats from the family (or add a guest), keep a running tally across rematches, and let the turn curtain hide hands between turns in UNO and Scrabble so nobody peeks. When you finish, you can optionally share the result to the family feed without affecting anyone's stars or rankings.
+
+### 🧩 Puzzle Corner & family-made puzzles
+
+- **This week's family puzzle** — a fresh crossword or word search every Monday, with the exact same grid for everyone and a family times board
+- **Make your own puzzles** — type 4–15 of your own words (holidays, pets, spelling lists) to turn into a crossword or word search, with optional AI-drafted clues you can edit
+
+### 🎮 Two new games & fresh artwork
+
+- **Tetris** and **2048** join the lineup with touch-friendly and keyboard controls
+- All **56 games** now have their own illustrated tiles across the app, plus a crisp link preview when you share Noodle Quest
+- A new **Why Play?** page explains what research says about active games versus doom-scrolling
+
+### 📅 Weekly family recap
+
+A rolling 7-day **This week in the family** card on Home highlights games played, stars earned, star of the week, most-played game, challenge results, and the weekly puzzle leader — with an optional Sunday summary email.
+
+### ✨ Fixes & polish
+
+- **GIF search is back** in family chat (always G-rated, and off in kid mode)
+- Solo wins now always save in Ludo, Snakes & Ladders, Scrabble, Connect Four, Score Four, and Bingo
+- UNO no longer deals duplicate cards on the first solo round, and Score Four's two bead colours are now clearly distinct
+- Word Search grids fit cleanly on phones, Story Builder and Routine Roadmap give fair partial credit for interchangeable steps, and dozens of map, word-list, and clue quirks were tidied up
+
+### 🔐 Under the hood
+
+- New signups without an invite link wait for owner approval; kid mode and online board-game rules are checked more tightly on the server
+- Better keyboard and screen-reader accessibility across game boards and cards
+
+---
+
 ## 1.2 — 13 September 2026
 
 A mobile-polish pass: three new games, a chat that stops scrolling away from you, and breathing exercises that tell you the pattern before you start.

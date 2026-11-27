@@ -249,6 +249,16 @@ pnpm run convex:deploy  # backend only
 pnpm run pages:dev      # local preview via wrangler pages dev
 ```
 
+## Versioning and releases
+
+`package.json`'s `version` is the single source of truth — Vite injects it at build time and the app displays it on the Profile screen linking to `RELEASE_NOTES.md`.
+
+To release a user-facing change:
+
+1. Bump `version` in `package.json` (new feature: minor; fix only: patch).
+2. Add a `## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md` and plain-English notes under `## x.y — <date>` in `RELEASE_NOTES.md` (`pnpm test` checks that both match `package.json`).
+3. Merge to `main` — Cloudflare Pages deploys automatically. Git tags (such as `v1.1.0` and `v1.2.0`) are optional; no manual tags are needed.
+
 ## License
 
 Private — all rights reserved.

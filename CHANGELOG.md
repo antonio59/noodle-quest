@@ -5,6 +5,84 @@ All notable changes to **Noodle Quest v2** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-10-27
+
+### Security
+- Closed security audit findings: single-use invite signup approval
+  without locking the lobby, viewer-sanitized move history, server-side
+  Connect Four and Chess move checks, bounded feed/report queries,
+  rate-limited anonymous signups, and challenge scores verified from
+  stored rows
+- Pinned Node.js 22.23.4 (`CVE-2026-111497`) and cleared Vite, Vitest,
+  and transitive lockfile advisories
+
+### Changed
+- Cloudflare Pages preview builds skip production Convex deploys while
+  still building the frontend preview cleanly
+
+## [1.3.0] - 2026-09-25
+
+### Added
+- **Pass & Play on one device** for 9 board games (Checkers, Chess,
+  Connect Four, Ludo, Scrabble, Score Four, Snakes & Ladders,
+  Tic-Tac-Toe, and UNO): shared seat picker (family or guests), turn
+  banner, privacy curtain for card/tile hands, running rematch tally
+  with rotating first move, and opt-in family feed posts
+- **Puzzle Corner**: alternating weekly family crossword/word search
+  with a shared grid and family times board, plus a family puzzle maker
+  (4–15 custom words) with optional rate-limited AI clue drafting
+  (`ANTHROPIC_API_KEY`) and manual fallback
+- **Two new games**: **Tetris** (Flexibility) and **2048** (Board) with
+  touch-first and keyboard controls
+- **Weekly family recap**: rolling 7-day summary card on Home and a
+  Sunday 17:00 UTC recap email via Resend
+- **Why Play page** (`/why-play`): curated static reading page on games
+  and the brain, linked from Landing and Home
+- **Illustrated game tiles** (`public/art/*.svg`) for all 56 games
+  (`pnpm art:build`), plus a generated link-preview image
+  (`public/og.jpg`) and refreshed Open Graph / Twitter metadata
+- **Owner signup approval**: uninvited signups stay pending until
+  approved via a single-use Resend email link or the admin panel;
+  multiplayer invite-link signups auto-approve
+- Offline content-audit tooling (`scripts/jev-audit`, `pnpm audit:content`)
+
+### Changed
+- Project renamed from `noodle-quest-v2` to `noodle-quest`
+- Intro/finish headers across 36 games use each game's illustrated art
+  tile; board game cards stack Together/Online buttons on narrow screens
+- Word Search grids scale to the viewport so 10+ column puzzles fit on
+  phones without clipping
+- Story Builder and Routine Roadmap award partial credit for swappable
+  steps; Flag Match favours visually confusable distractors
+- Accessibility improvements: Sudoku cells, admin merge rows, crossword
+  clues, and breathe cards are native buttons; `focus-visible` rings
+  restored on game grids
+
+### Fixed
+- **GIF search works again**: GIPHY queries are proxied through Convex
+  (`GIPHY_API_KEY`, G-rated only, blocked in kid mode) instead of
+  requiring a client-side build key
+- **Solo wins now save reliably** in Ludo, Snakes & Ladders, Scrabble,
+  Connect Four, Score Four, and Bingo (end-of-game callback was dropped
+  after marking the match ended)
+- UNO first solo deal no longer draws from separate shuffles (eliminating
+  duplicate cards)
+- Score Four gives player 2 tomato-red beads instead of near-identical
+  amber
+- Content fixes from the full content audit: removed Republic of Ireland
+  cities from the UK map, fixed colliding Dominica alias, removed Brazil
+  from Antarctica claimants, cleaned Bookworm/Word Guess word lists, and
+  rewrote 18 ambiguous or kid-unfriendly clues
+- Weekly recap queries indexed `challenges.by_completed` instead of
+  scanning the whole challenges table
+
+### Security
+- Gated `getFeed`, `getActivity`, and `getLeaderboard` behind session
+  tokens; capped webhook payload sizes and validated `playerId` format
+- Enforced kid mode server-side on feed posts; local match posts are
+  composed server-side from validated seat names (family names only in
+  kid mode) and AI clue inputs are length-bounded
+
 ## [1.2.0] - 2026-09-13
 
 ### Added
