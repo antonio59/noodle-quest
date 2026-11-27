@@ -350,7 +350,7 @@ reg('uno', {
   description: 'Match colors and numbers — be first to empty your hand!',
   category: 'board', stages: 99, hasAdaptiveAi: true,
   minPlayers: 2, maxPlayers: 2,
-  passAndPlay: { min: 2, max: 2 },
+  passAndPlay: { min: 2, max: 4 },
 }, () => import('@/games/uno'));
 
 reg('word-guess', {
