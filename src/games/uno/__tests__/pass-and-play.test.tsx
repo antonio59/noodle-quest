@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { GameProps, LocalSeat } from '@/types';
 import Uno from '@/games/uno';
-import { dealInitial, type UnoCard, type UnoColor } from '../logic';
+import { createDeck, dealInitial, type UnoCard, type UnoColor } from '../logic';
 
 // Deterministic deals: swap only dealInitial, keep the real rules.
 vi.mock('../logic', async importOriginal => {
   const actual = await importOriginal<typeof import('../logic')>();
-  return { ...actual, dealInitial: vi.fn(actual.dealInitial) };
+  return { ...actual, dealInitial: vi.fn(actual.dealInitial), createDeck: vi.fn(actual.createDeck) };
 });
 
 let nextId = 1000;
@@ -27,13 +27,25 @@ function dealWith(pHand: UnoCard[], aHand: UnoCard[] = MIA_HAND(), color: UnoCol
 }
 
 const SEATS: LocalSeat[] = [{ name: 'Dad', avatar: '🐻' }, { name: 'Mia', avatar: '🦊' }];
+const THREE: LocalSeat[] = [...SEATS, { name: 'Sam', avatar: '🐸' }];
+const FOUR: LocalSeat[] = [...THREE, { name: 'Leo', avatar: '🐼' }];
 
-function renderTable(onEnd = vi.fn()) {
+function renderTable(onEnd = vi.fn(), seats: LocalSeat[] = SEATS) {
   const props: GameProps = {
-    stage: 1, onScore: vi.fn(), onProgress: vi.fn(), onMessage: vi.fn(), onEnd, localSeats: SEATS,
+    stage: 1, onScore: vi.fn(), onProgress: vi.fn(), onMessage: vi.fn(), onEnd, localSeats: seats,
   };
   render(<Uno {...props} />);
   return onEnd;
+}
+
+/** Hands of 7 from a fixed deck order, so a 3- or 4-seat deal is not a shuffle. */
+function mockHands(hands: UnoCard[][]) {
+  const full = hands.map(hand => {
+    const cards = [...hand];
+    while (cards.length < 7) cards.push(card('yellow', '1'));
+    return cards;
+  });
+  vi.mocked(createDeck).mockReturnValue([...full.flat(), RED_5(), ...DECK()]);
 }
 
 const curtainFor = (name: string) => screen.queryByRole('dialog', { name: `Pass the device to ${name}` });
@@ -159,5 +171,67 @@ describe('UNO pass & play', () => {
     render(<Uno {...props} />);
     expect(screen.getByRole('button', { name: /start game/i })).toBeInTheDocument();
     expect(curtainFor('Dad')).not.toBeInTheDocument();
+  });
+
+  test('three seats curtain each hand, and a skip jumps the next person', () => {
+    mockHands([
+      [card('red', '7'), card('red', 'skip', 'action')],
+      [card('red', '8')],
+      [card('red', '9')],
+    ]);
+    renderTable(vi.fn(), THREE);
+
+    const opening = curtainFor('Dad');
+    expect(opening).toBeInTheDocument();
+    expect(within(opening!).getByText('Dad goes first · Mia has 7 cards · Sam has 7 cards')).toBeInTheDocument();
+    expect(handOf('Dad')).not.toBeInTheDocument();
+
+    takeDevice('Dad');
+    expect(screen.getByText('Mia · 7 cards')).toBeInTheDocument();
+    expect(screen.getByText('Sam · 7 cards')).toBeInTheDocument();
+
+    playCard('Red Skip');
+    const skipped = curtainFor('Sam');
+    expect(skipped).toBeInTheDocument();
+    expect(curtainFor('Mia')).not.toBeInTheDocument();
+    expect(within(skipped!).getByText(/Dad played Red Skip/)).toBeInTheDocument();
+    expect(handOf('Mia')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Red 7' })).not.toBeInTheDocument();
+
+    takeDevice('Sam');
+    expect(screen.getByText("Sam's turn")).toBeInTheDocument();
+    expect(handOf('Dad')).not.toBeInTheDocument();
+    expect(handOf('Mia')).not.toBeInTheDocument();
+  });
+
+  test('four seats pass the curtain once around the table', () => {
+    mockHands([
+      [card('red', '7')],
+      [card('red', '8')],
+      [card('red', '9')],
+      [card('red', '1')],
+    ]);
+    renderTable(vi.fn(), FOUR);
+
+    expect(within(curtainFor('Dad')!).getByText('Dad goes first · Mia has 7 cards · Sam has 7 cards · Leo has 7 cards')).toBeInTheDocument();
+    takeDevice('Dad');
+    playCard('Red 7');
+    expect(curtainFor('Mia')).toBeInTheDocument();
+    expect(within(curtainFor('Mia')!).getByText('Dad played Red 7 · Dad has 6 cards')).toBeInTheDocument();
+
+    takeDevice('Mia');
+    playCard('Red 8');
+    expect(curtainFor('Sam')).toBeInTheDocument();
+
+    takeDevice('Sam');
+    playCard('Red 9');
+    expect(curtainFor('Leo')).toBeInTheDocument();
+    expect(handOf('Sam')).not.toBeInTheDocument();
+
+    takeDevice('Leo');
+    playCard('Red 1');
+    expect(curtainFor('Dad')).toBeInTheDocument();
+    expect(within(curtainFor('Dad')!).getByText('Leo played Red 1 · Leo has 6 cards')).toBeInTheDocument();
+    expect(handOf('Leo')).not.toBeInTheDocument();
   });
 });

@@ -23,7 +23,7 @@ Every game has an illustrated tile (flat SVG, tinted by category) generated from
 
 ### Pass & Play
 
-Nine board games — Checkers, Chess, Connect Four, Ludo, Scrabble, Score Four, Snakes & Ladders, Tic-Tac-Toe and UNO — can be played by 2–4 people sharing one device. Pick seats from the family (or add a guest), take turns, and keep a running tally across rematches (first move rotates each rematch). Card and tile games cover the screen between turns ("Pass to Mia") so nobody sees anyone else's hand. Results are opt-in posts to the family feed; nothing counts toward stars or rankings.
+Nine board games — Checkers, Chess, Connect Four, Ludo, Scrabble, Score Four, Snakes & Ladders, Tic-Tac-Toe and UNO — can be played by 2–4 people sharing one device. Local UNO seats 2–4 at one table. Online UNO is still two players. Pick seats from the family (or add a guest), take turns, and keep a running tally across rematches (first move rotates each rematch). Card and tile games cover the screen between turns ("Pass to Mia") so nobody sees anyone else's hand. Results are opt-in posts to the family feed; nothing counts toward stars or rankings.
 
 ### Puzzle Corner
 

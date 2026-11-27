@@ -1,5 +1,14 @@
 # Release Notes — Noodle Quest
 
+## 1.3.2 — 27 November 2026
+
+UNO at the table now deals everyone in.
+
+- Pass one phone or tablet around for UNO with 2, 3, or 4 people. Skip, Reverse, and Draw cards follow the seats, and the "Pass to…" curtain still hides the next hand
+- Online UNO is still a game for two
+
+---
+
 ## 1.3.1 — 27 October 2026
 
 A behind-the-scenes safety update; nothing changes in how you play.

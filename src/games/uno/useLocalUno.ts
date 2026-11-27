@@ -3,14 +3,14 @@
 // play.tsx who won exactly once.
 import { useRef, useState } from 'react';
 import type { GameProps, LocalSeat } from '@/types';
-import { seatAt } from '@/lib/pass-and-play';
 import type { UnoCard, UnoColor } from './logic';
 import { advance, beginMatch, drawCard, playCard, type LocalUnoState, type TurnOutcome } from './local-rules';
 
 const canAct = (s: LocalUnoState) => !s.curtain && !s.pendingWild && !s.winner;
 
 export function useLocalUno(seats: readonly LocalSeat[], onEnd: GameProps['onEnd']) {
-  const names = [seatAt(seats, 1).name, seatAt(seats, 2).name] as const;
+  // shortcut: 4 local seats, when the pass-and-play manifest allows more.
+  const names = seats.slice(0, 4).map(s => s.name);
   const [state, setState] = useState<LocalUnoState>(() => beginMatch(names));
   const endedRef = useRef(false);
 

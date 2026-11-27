@@ -1,13 +1,13 @@
-// Pass & play UNO: two people share one device. Only the seat whose turn it
-// is sees their hand face-up; whenever the device changes hands a curtain
-// covers the table until the next person says they're holding it.
+// Pass & play UNO: two to four people share one device. Only the seat whose
+// turn it is sees their hand face-up; whenever the device changes hands a
+// curtain covers the table until the next person says they're holding it.
 import type { GameProps, LocalSeat } from '@/types';
 import { seatAt } from '@/lib/pass-and-play';
 import { TurnBanner } from '@/components/pass-and-play/TurnBanner';
 import { PassDeviceCurtain } from '@/components/pass-and-play/PassDeviceCurtain';
 import { canPlay, type UnoCard } from './logic';
 import { ColorPicker, DrawPrompt, FaceDownHand, HandFan, TablePiles, UnoCallout } from './cards';
-import { handOf, otherSeat, topOf } from './local-rules';
+import { handOf, topOf, type Seat } from './local-rules';
 import { useLocalUno } from './useLocalUno';
 
 interface LocalUnoProps {
@@ -35,7 +35,11 @@ export function LocalUno({ seats, onEnd }: LocalUnoProps) {
 
   const turn = table.turn;
   const hand = handOf(table, turn);
-  const otherCount = handOf(table, otherSeat(turn)).length;
+  const others = seats.slice(0, table.hands.length).flatMap((seat, i) => {
+    const n = (i + 1) as Seat;
+    return n === turn ? [] : [{ seat, n, count: handOf(table, n).length }];
+  });
+  const onlyOther = others.length === 1 ? others[0] : undefined;
   const topCard = topOf(table);
   const canAct = !curtain && !pendingWild && !winner;
   const matches = (card: UnoCard) => !!topCard && canPlay(card, topCard, table.color);
@@ -45,10 +49,12 @@ export function LocalUno({ seats, onEnd }: LocalUnoProps) {
     <div className="relative h-full flex flex-col items-center justify-between p-2 select-none overflow-hidden">
       <div className="w-full flex items-center justify-between gap-2 flex-shrink-0">
         <TurnBanner seats={seats} turnSeat={turn} />
-        <OtherHandCount seat={seatAt(seats, otherSeat(turn))} count={otherCount} />
+        <div className={others.length > 1 ? 'flex flex-col items-end gap-1' : 'contents'}>
+          {others.map(o => <OtherHandCount key={o.n} seat={o.seat} count={o.count} />)}
+        </div>
       </div>
 
-      <FaceDownHand count={otherCount} />
+      {onlyOther && <FaceDownHand count={onlyOther.count} />}
 
       <TablePiles
         deckCount={table.deck.length}
