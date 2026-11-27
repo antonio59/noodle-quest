@@ -9,6 +9,7 @@ import { feedbackEnabled, setFeedbackEnabled, playWin } from '@/lib/feedback';
 import { useNavigate } from 'react-router-dom';
 import { getRankTier, RANK_TIERS } from '@/lib/rank-tiers';
 import { GameArt } from '@/components/GameArt';
+import { APP_VERSION, RELEASE_NOTES_URL } from '@/lib/version';
 
 export function Profile() {
   const { player, logout, updateAvatar, updateName, updatePrefs } = useAuth();
@@ -371,6 +372,17 @@ export function Profile() {
         >
           <LogOut size={16} /> Log Out
         </button>
+
+        <p className="text-center text-xs text-text-muted pt-1">
+          <a
+            href={RELEASE_NOTES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-accent transition-colors"
+          >
+            Noodle Quest v{APP_VERSION}
+          </a>
+        </p>
       </div>
 
       {/* Logout confirmation modal */}
