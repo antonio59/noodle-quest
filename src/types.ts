@@ -18,6 +18,10 @@ export interface GameDefinition {
   maxPlayers?: number;
   /** Seat range for pass & play on one device. Absent = not supported. */
   passAndPlay?: { min: number; max: number };
+  /** Youngest age band. Editorial tag, not a birthdate. */
+  age?: AgeBand;
+  /** Rough minutes for one sitting. */
+  minutes?: MinuteRange;
 }
 
 /** A person at the table in pass & play. */
@@ -89,6 +93,15 @@ export type GameCategory =
   | 'sequence'
   | 'board'
   | 'breathe';
+
+/** Youngest age a game suits. An editorial band, not a birthdate. */
+export type AgeBand = 'everyone' | '4+' | '7+' | '10+';
+
+/** Rough minutes for one sitting. Time chips compare against `max`. */
+export interface MinuteRange {
+  min: number;
+  max: number;
+}
 
 export interface Player {
   playerId: string;

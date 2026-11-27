@@ -5,6 +5,16 @@ All notable changes to **Noodle Quest v2** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-11-27
+
+### Added
+- **Tonight's game picker**: age, players, and time chips on the games hub.
+  Every game has an editorial age band (Everyone, 4+, 7+, 10+) and a rough
+  minute range. Player count comes from the seats a game already declares.
+  Home's Play together card opens the board tab for 2 or more players. An
+  empty list names the chip to loosen. No birthdates, and no record of
+  which chip was used.
+
 ## [1.3.1] - 2026-10-27
 
 ### Security
