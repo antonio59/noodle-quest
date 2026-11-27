@@ -3,6 +3,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllGames } from '@/lib/game-registry';
+import { playTogetherHref } from '@/lib/game-picker';
 import { Star, Zap, Gamepad2, Sparkles, ChevronRight, ArrowRight, Swords } from 'lucide-react';
 import { getGame } from '@/lib/game-registry';
 import { computeBonusTiers, getBonusTier } from '@/lib/bonus-multiplier';
@@ -130,6 +131,19 @@ export function Home() {
             </span>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => navigate(playTogetherHref())}
+          className="w-full flex items-center gap-3 bg-card hover:bg-card-hover border border-white/5 hover:border-accent/30 rounded-2xl px-4 py-3.5 text-left transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <span className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-xl flex-shrink-0" aria-hidden>🎲</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-text">Play together</p>
+            <p className="text-xs text-text-muted mt-0.5">Board games for 2 or more</p>
+          </div>
+          <ChevronRight size={16} className="text-text-muted flex-shrink-0" aria-hidden />
+        </button>
 
         {/* ── Weekly family puzzle ────────────────────────── */}
         <WeeklyPuzzleCard />

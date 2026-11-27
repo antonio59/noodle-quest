@@ -1,5 +1,13 @@
 # Release Notes — Noodle Quest
 
+## 1.4 — 27 November 2026
+
+Find a game for the people in the room.
+
+The games tab now has chips for age (Everyone, 4+, 7+, 10+), how many people are playing (1, 2, or 3–4), and how long you have (under 5 minutes or under 15). Every game is tagged. Those tags are age bands and a rough time, not birthdates. Home has a **Play together** card that opens board games for two or more. If nothing matches, the page tells you which chip to loosen. Noodle Quest does not record which filter you used.
+
+---
+
 ## 1.3.1 — 27 October 2026
 
 A behind-the-scenes safety update; nothing changes in how you play.

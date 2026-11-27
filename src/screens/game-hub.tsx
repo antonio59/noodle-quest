@@ -1,9 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllGames } from '@/lib/game-registry';
+import {
+  AGE_CHIPS, PLAYER_CHIPS, TIME_CHIPS,
+  hasPickerFilters, loosenChipMessage, matchesPicker, parsePickerParams,
+  playerChipOn, toggleAge, togglePlayers, toggleTime, writePickerParams,
+  type PickerFilters,
+} from '@/lib/game-picker';
 import { GAME_CATEGORIES, type GameCategory } from '@/types';
 import { Heart, Search, Play, Pause, Wind, Star, Sparkles, Volume2, VolumeX, Moon, Smartphone, Globe, Puzzle as PuzzleIcon } from 'lucide-react';
 import { RequestGameModal } from '@/components/RequestGameModal';
@@ -73,6 +79,70 @@ function CardMeta({ starsEarned, bonusMultiplier, size = 'sm' }: { starsEarned: 
   );
 }
 
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+        active ? 'bg-accent text-bg' : 'bg-card text-text-muted hover:text-text'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PickerChips({ filters, onChange, className }: { filters: PickerFilters; onChange: (next: PickerFilters) => void; className?: string }) {
+  return (
+    <div className={className ?? 'px-4 pb-2 space-y-2'}>
+      <div className="flex items-center gap-2" role="group" aria-label="Age">
+        <span className="text-[10px] font-bold text-text-muted w-12 flex-shrink-0">Age</span>
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
+          {AGE_CHIPS.map(chip => (
+            <FilterChip
+              key={chip.id}
+              active={filters.age === chip.id}
+              onClick={() => onChange({ ...filters, age: toggleAge(filters.age, chip.id) })}
+            >
+              {chip.label}
+            </FilterChip>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2" role="group" aria-label="Players">
+        <span className="text-[10px] font-bold text-text-muted w-12 flex-shrink-0">Players</span>
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
+          {PLAYER_CHIPS.map(chip => (
+            <FilterChip
+              key={chip.id}
+              active={playerChipOn(filters.players, chip.id)}
+              onClick={() => onChange({ ...filters, players: togglePlayers(filters.players, chip.id) })}
+            >
+              {chip.label}
+            </FilterChip>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2" role="group" aria-label="Time">
+        <span className="text-[10px] font-bold text-text-muted w-12 flex-shrink-0">Time</span>
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
+          {TIME_CHIPS.map(chip => (
+            <FilterChip
+              key={chip.id}
+              active={filters.time === chip.id}
+              onClick={() => onChange({ ...filters, time: toggleTime(filters.time, chip.id) })}
+            >
+              {chip.label}
+            </FilterChip>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TABS = [
   {
     id: 'brain',
@@ -103,8 +173,14 @@ const TABS = [
 export function GameHub() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'brain';
-  const [tab, setTab] = useState(initialTab);
+  const tabParam = searchParams.get('tab');
+  const tab = TABS.some(t => t.id === tabParam) ? tabParam! : 'brain';
+  const filters = parsePickerParams(searchParams);
+  const setFilters = (nextFilters: PickerFilters) => {
+    const next = new URLSearchParams(searchParams);
+    writePickerParams(next, nextFilters);
+    setSearchParams(next, { replace: true });
+  };
   const audio = useAudioEngine();
   const { player } = useAuth();
   const playerStats = useQuery(
@@ -134,21 +210,24 @@ export function GameHub() {
   const filteredGames = brainGames.filter(g => {
     if (category !== 'all' && g.category !== category) return false;
     if (search && !g.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+    return matchesPicker(g, filters);
   });
 
   const favGames = brainGames.filter(g => favorites.has(g.id));
-  // Search matches from OTHER tabs (board, breathe) — surfaced under the
-  // main results so any of the 51 games is findable from the search box.
+  // Search matches from other tabs (board, breathe) so any game is findable
+  // from the search box. Picker chips apply there too.
   const crossTabMatches = search
     ? allGames.filter(g =>
         (g.category === 'board' || g.category === 'breathe') &&
-        g.name.toLowerCase().includes(search.toLowerCase()))
+        g.name.toLowerCase().includes(search.toLowerCase()) &&
+        matchesPicker(g, filters))
     : [];
 
   const handleTabChange = (newTab: string) => {
-    setTab(newTab);
-    setSearchParams(newTab === 'brain' ? {} : { tab: newTab });
+    const next = new URLSearchParams(searchParams);
+    if (newTab === 'brain') next.delete('tab');
+    else next.set('tab', newTab);
+    setSearchParams(next);
   };
 
   const navigateToGame = (gameId: string, stage: number = 1) => {
@@ -215,7 +294,7 @@ export function GameHub() {
             </div>
           </div>
 
-          {favGames.length > 0 && !search && (
+          {favGames.length > 0 && !search && !hasPickerFilters(filters) && (
             <div className="p-4 pb-0">
               <h3 className="text-sm font-bold text-text-dim mb-3 flex items-center gap-1.5">
                 <Heart size={14} className="text-danger" fill="currentColor" /> Favorites
@@ -258,6 +337,8 @@ export function GameHub() {
               ))}
             </div>
           </div>
+
+          <PickerChips filters={filters} onChange={setFilters} />
 
           <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredGames.map(g => {
@@ -339,8 +420,14 @@ export function GameHub() {
             </div>
           )}
 
-          {search && filteredGames.length === 0 && crossTabMatches.length === 0 && (
-            <p className="text-center text-text-muted text-sm py-8">No games match "{search}"</p>
+          {filteredGames.length === 0 && crossTabMatches.length === 0 && (search || hasPickerFilters(filters) || category !== 'all') && (
+            <p className="text-center text-text-muted text-sm py-8 px-4">
+              {loosenChipMessage(
+                filters,
+                category !== 'all' ? [CATEGORY_STYLES[category]?.label ?? category] : [],
+                search || undefined,
+              ) ?? `No games match "${search}"`}
+            </p>
           )}
 
           {/* Request a Game card */}
@@ -366,6 +453,7 @@ export function GameHub() {
 
       {tab === 'board' && (
         <div className="flex-1 overflow-y-auto">
+          <PickerChips filters={filters} onChange={setFilters} className="px-4 pt-4 space-y-2" />
           <button
             type="button"
             onClick={() => navigate('/puzzles')}
@@ -380,7 +468,7 @@ export function GameHub() {
           </button>
           <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {allGames
-              .filter(g => g.category === 'board')
+              .filter(g => g.category === 'board' && matchesPicker(g, filters))
               .slice()
               .sort((a, b) => a.name.localeCompare(b.name))
               .map(g => {
@@ -460,13 +548,20 @@ export function GameHub() {
               </div>
             )}
           </div>
+          {allGames.some(g => g.category === 'board') &&
+            allGames.filter(g => g.category === 'board' && matchesPicker(g, filters)).length === 0 && (
+            <p className="text-center text-text-muted text-sm py-8 px-4">
+              {loosenChipMessage(filters)}
+            </p>
+          )}
         </div>
       )}
 
       {tab === 'breathe' && (
         <div className="flex-1 overflow-y-auto">
+          <PickerChips filters={filters} onChange={setFilters} className="px-4 pt-4 space-y-2" />
           <div className="p-4 space-y-3">
-            {allGames.filter(g => g.category === 'breathe').map(g => {
+            {allGames.filter(g => g.category === 'breathe' && matchesPicker(g, filters)).map(g => {
               const th = BREATHE_THEMES[g.id] ?? BREATHE_THEMES['box-breathing'];
               return (
                 <button
@@ -524,6 +619,12 @@ export function GameHub() {
               );
             })}
           </div>
+          {allGames.some(g => g.category === 'breathe') &&
+            allGames.filter(g => g.category === 'breathe' && matchesPicker(g, filters)).length === 0 && (
+            <p className="text-center text-text-muted text-sm py-8 px-4">
+              {loosenChipMessage(filters)}
+            </p>
+          )}
         </div>
       )}
 

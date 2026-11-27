@@ -6,7 +6,72 @@
  * Within each section games are ordered alphabetically by name.
  */
 import { registerGame, registerAlias } from './game-registry';
-import type { GameCategory } from '@/types';
+import type { AgeBand, GameCategory, MinuteRange } from '@/types';
+
+function tag(age: AgeBand, min: number, max: number): { age: AgeBand; minutes: MinuteRange } {
+  return { age, minutes: { min, max } };
+}
+
+// Editorial bands for the hub picker. Not birthdates. Player count is derived
+// from passAndPlay / minPlayers / maxPlayers, not stored here.
+const PICKER_TAGS = {
+  anagram: tag('7+', 3, 8),
+  'attention-archery': tag('4+', 1, 3),
+  'breath-bubbles': tag('everyone', 2, 5),
+  'color-rush': tag('7+', 2, 5),
+  'cube-twist': tag('7+', 5, 15),
+  'copy-cat': tag('everyone', 2, 5),
+  'dual-n-back': tag('10+', 8, 20),
+  'echo-tap': tag('4+', 2, 5),
+  'emotion-volcano': tag('7+', 3, 8),
+  'empathy-engine': tag('7+', 4, 10),
+  'feelings-faces': tag('7+', 3, 8),
+  'fill-blank': tag('7+', 3, 10),
+  'flag-match': tag('7+', 3, 8),
+  'map-quiz': tag('10+', 8, 20),
+  'flexibility-frames': tag('7+', 3, 8),
+  'focus-frenzy': tag('4+', 2, 5),
+  'go-no-go': tag('4+', 1, 3),
+  grounding: tag('7+', 3, 8),
+  'just-right': tag('4+', 2, 6),
+  'memory-match': tag('everyone', 2, 5),
+  'mirror-match': tag('4+', 2, 5),
+  'mistake-master': tag('7+', 3, 8),
+  'mole-mash': tag('everyone', 1, 3),
+  'number-ninja': tag('7+', 2, 6),
+  'patience-pop': tag('everyone', 1, 4),
+  'pattern-painter': tag('4+', 2, 8),
+  'pixel-paint': tag('4+', 3, 10),
+  'quick-math': tag('7+', 2, 6),
+  'routine-roadmap': tag('7+', 2, 6),
+  'squish-lab': tag('4+', 2, 6),
+  'steady-hands': tag('4+', 3, 10),
+  'story-builder': tag('7+', 3, 8),
+  'stroop-challenge': tag('7+', 3, 8),
+  tetris: tag('7+', 5, 15),
+  sudoku: tag('10+', 10, 30),
+  bingo: tag('4+', 8, 15),
+  bookworm: tag('7+', 5, 15),
+  checkers: tag('7+', 8, 15),
+  chess: tag('10+', 15, 40),
+  'connect-four': tag('4+', 4, 10),
+  'connect-lines': tag('7+', 5, 12),
+  crossword: tag('10+', 10, 25),
+  '2048': tag('7+', 5, 15),
+  ludo: tag('4+', 10, 20),
+  minesweeper: tag('10+', 5, 20),
+  scrabble: tag('10+', 20, 45),
+  'score-four': tag('7+', 5, 12),
+  'snakes-ladders': tag('everyone', 8, 15),
+  'tic-tac-toe': tag('4+', 1, 3),
+  uno: tag('7+', 8, 15),
+  'word-guess': tag('7+', 2, 5),
+  wordsearch: tag('7+', 5, 12),
+  'calm-breathing': tag('4+', 1, 7),
+  'box-breathing': tag('7+', 3, 13),
+  'coherent-breathing': tag('7+', 2, 12),
+  'triangle-breathing': tag('everyone', 2, 14),
+} satisfies Record<string, { age: AgeBand; minutes: MinuteRange }>;
 
 interface Entry {
   name: string;
@@ -26,7 +91,9 @@ interface Entry {
 }
 
 function reg(id: string, meta: Entry, loader: () => Promise<{ default: any }>) {
-  registerGame(id, meta, loader);
+  const tags = PICKER_TAGS[id as keyof typeof PICKER_TAGS];
+  if (!tags) throw new Error(`missing age and time tags for ${id}`);
+  registerGame(id, { ...meta, ...tags }, loader);
 }
 
 // ── Brain games (alphabetical) ────────────────────────────────────

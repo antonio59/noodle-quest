@@ -21,6 +21,8 @@ Board games play against an AI with real search (minimax + alpha-beta) and stage
 
 Every game has an illustrated tile (flat SVG, tinted by category) generated from `scripts/game-art` with `pnpm art:build`.
 
+The games hub filters that catalog with chips: age (Everyone, 4+, 7+, 10+), players (1, 2, 3–4), and time (under 5 minutes, under 15). Age and time are editorial tags on each game, not birthdates. Player count is taken from the seats a game already declares (pass-and-play or online). Home's **Play together** card opens the board tab with games for 2 or more. If a combination matches nothing, the hub names the chip to loosen. The app does not record which chip was used.
+
 ### Pass & Play
 
 Nine board games — Checkers, Chess, Connect Four, Ludo, Scrabble, Score Four, Snakes & Ladders, Tic-Tac-Toe and UNO — can be played by 2–4 people sharing one device. Pick seats from the family (or add a guest), take turns, and keep a running tally across rematches (first move rotates each rematch). Card and tile games cover the screen between turns ("Pass to Mia") so nobody sees anyone else's hand. Results are opt-in posts to the family feed; nothing counts toward stars or rankings.
